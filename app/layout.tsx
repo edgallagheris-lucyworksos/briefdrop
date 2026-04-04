@@ -3,13 +3,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BriefDrop",
-  description: "Paste messy messages. Get the brief.",
+  description: "Turn messy messages into a usable brief.",
   applicationName: "BriefDrop",
   appleWebApp: {
     capable: true,
     title: "BriefDrop",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
+  themeColor: "#020617",
 };
 
 export default function RootLayout({
