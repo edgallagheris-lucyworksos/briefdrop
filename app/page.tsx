@@ -13,7 +13,7 @@ type BriefDropResult = {
 
 export default function Page() {
   const [input, setInput] = useState(
-    "Need quote for bathroom. Leak by shower and maybe damaged floor too. Want to tile whole thing if price is sensible. Can you start soon? We can supply tiles if needed. Rough budget maybe around £4,000 but not sure. Also can you check extractor?"
+    "Need a quote for a landing page rewrite and email sequence for a new service launch. We need better positioning, 5 emails, and a tighter offer page. Budget is around £1,500 to £2,500. We have rough notes but no proper brief yet. Can you review this week and tell us what you need first?"
   );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BriefDropResult | null>(null);
@@ -64,11 +64,11 @@ export default function Page() {
   async function handleCopy() {
     const text = result
       ? [
-          `Clean brief:\n${result.brief}`,
-          `\nKey requirements:\n- ${result.requirements.join("\n- ") || "None"}`,
-          `\nMissing information:\n- ${result.missingInfo.join("\n- ") || "None"}`,
+          `Brief:\n${result.brief}`,
+          `\nRequirements:\n- ${result.requirements.join("\n- ") || "None"}`,
+          `\nMissing info:\n- ${result.missingInfo.join("\n- ") || "None"}`,
           `\nNext steps:\n- ${result.nextSteps.join("\n- ") || "None"}`,
-          `\nMoney references:\n- ${result.money.join("\n- ") || "None"}`,
+          `\nMoney / pricing:\n- ${result.money.join("\n- ") || "None"}`,
           `\nQuestions found:\n- ${result.questionsFound.join("\n- ") || "None"}`,
         ].join("\n")
       : input;
@@ -83,13 +83,13 @@ export default function Page() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-8">
           <div className="inline-flex rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-xs font-medium text-teal-300">
-            BriefDrop MVP
+            BriefDrop Universal
           </div>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight md:text-6xl">
             Paste the messages. Get the brief.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-            Turn messy WhatsApp or email messages into a clean brief, missing info, and next steps.
+            Turn messy WhatsApp, email, sales, project, or client messages into a clean brief, clearer scope, money signals, and next steps.
           </p>
         </div>
 
@@ -103,7 +103,7 @@ export default function Page() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               className="min-h-[320px] w-full rounded-2xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-teal-400"
-              placeholder="Paste WhatsApp, email, or rough enquiry notes here..."
+              placeholder="Paste WhatsApp, email, sales enquiry, project notes, or rough scope here..."
             />
 
             <div className="mt-4 flex flex-wrap gap-3">
@@ -157,15 +157,15 @@ export default function Page() {
               </div>
             ) : (
               <div className="space-y-4">
-                <Card title="Clean brief">
+                <Card title="Brief">
                   <p className="text-sm leading-7 text-slate-200">{result.brief}</p>
                 </Card>
 
-                <Card title="Key requirements">
+                <Card title="Requirements">
                   <BulletList items={result.requirements} empty="No clear requirements found." />
                 </Card>
 
-                <Card title="Missing information">
+                <Card title="Missing info">
                   <BulletList items={result.missingInfo} empty="No obvious missing information found." />
                 </Card>
 
@@ -174,7 +174,7 @@ export default function Page() {
                 </Card>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Card title="Money references">
+                  <Card title="Money / pricing">
                     <BulletList items={result.money} empty="No money references found." />
                   </Card>
 

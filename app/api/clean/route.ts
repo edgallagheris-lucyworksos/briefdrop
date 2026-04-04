@@ -14,7 +14,7 @@ function normalise(text: string) {
 }
 
 function unique(items: string[]) {
-  return [...new Set(items.filter(Boolean))];
+  return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
 }
 
 function splitSentences(text: string) {
@@ -25,148 +25,152 @@ function splitSentences(text: string) {
 }
 
 function extractQuestions(text: string) {
-  return splitSentences(text).filter((s) => s.includes("?"));
+  return unique(splitSentences(text).filter((s) => s.includes("?")));
+}
+
+function collectMatches(text: string, regex: RegExp) {
+  return unique(Array.from(text.matchAll(regex), (match) => match[0]));
 }
 
 function extractMoney(text: string) {
-  const matches = text.match(
-    /(?:£\s?\d[\d,]*(?:\.\d{1,2})?\s?(?:k|m)?(?:\s?(?:to|-)\s?£?\s?\d[\d,]*(?:\.\d{1,2})?\s?(?:k|m)?)?|\b\d[\d,]*(?:\.\d{1,2})?\s?(?:k|m)\b)/gi
-  );
-  return unique(matches || []);
+  const patterns = [
+    /(?:£\s?\d[\d,]*(?:\.\d{1,2})?\s?(?:k|m)?(?:\s?(?:to|-|–)\s?£?\s?\d[\d,]*(?:\.\d{1,2})?\s?(?:k|m)?)?)/gi,
+    /(?:\b(?:budget|budgets|ballpark|estimate|estimated|roughly|around|about|max spend|maximum spend|fixed fee|fee|deposit|retainer|labour only|labor only|daily rate|day rate|hourly rate|instalments?|installments?|payment plan|outstanding balance|cash available now)\b[^.?!]{0,40})/gi,
+  ];
+
+  return unique(patterns.flatMap((pattern) => collectMatches(text, pattern)));
 }
 
 function extractMeasurements(text: string) {
-  const matches = text.match(
-    /\b\d+(?:\.\d+)?\s?(?:mm|cm|m|metre|metres|meter|meters|sqm|sq m|m2)\b|\b\d+(?:\.\d+)?\s?x\s?\d+(?:\.\d+)?\s?(?:m|metres|meters)?\b/gi
-  );
-  return unique(matches || []);
+  const patterns = [
+    /\b\d+(?:\.\d+)?\s?(?:mm|cm|m|metre|metres|meter|meters|sqm|sq m|m2|square metres|square meters)\b/gi,
+    /\b\d+(?:\.\d+)?\s?x\s?\d+(?:\.\d+)?\s?(?:m|metres|meters|cm|mm)?\b/gi,
+    /\b(?:\d+(?:\.\d+)?)\s?(?:bed|bedroom|bedrooms|storey|story|floor|floors)\b/gi,
+  ];
+
+  return unique(patterns.flatMap((pattern) => collectMatches(text, pattern)));
 }
 
 function extractTiming(text: string) {
-  const matches = text.match(
-    /\b(?:asap|urgent|this week|next week|weekend|weekends|evenings|after \w+|before the \d{1,2}(?:st|nd|rd|th)?|on the \d{1,2}(?:st|nd|rd|th)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d+\s+days?)\b/gi
-  );
-  return unique(matches || []);
-}
-
-function detectRooms(text: string) {
-  const lower = text.toLowerCase();
-  const rooms = [
-    "bathroom",
-    "shower room",
-    "kitchen",
-    "bedroom",
-    "front room",
-    "lounge",
-    "hall",
-    "hallway",
-    "landing",
-    "office",
-    "ceiling",
-    "roof",
-    "rear elevation",
-    "front elevation",
-    "window",
-    "doors",
-  ];
-  return rooms.filter((room) => lower.includes(room));
-}
-
-function detectIssues(text: string) {
-  const lower = text.toLowerCase();
-  const issues: string[] = [];
-
-  const patterns: Array<[RegExp, string]> = [
-    [/\bleak|leaking|escape of water\b/i, "Leak or water ingress"],
-    [/\bdamp|moisture|wet\b/i, "Damp or moisture issue"],
-    [/\bcrack|cracking\b/i, "Cracking or movement concern"],
-    [/\bsoft floor|spongy|springy|floor feels wrong|damaged floor\b/i, "Possible floor damage"],
-    [/\btray\b/i, "Shower tray issue"],
-    [/\bextractor|fan\b/i, "Extractor / ventilation issue"],
-    [/\btile|tiling|retile\b/i, "Tiling work"],
-    [/\bdoor|doors\b/i, "Door replacement or adjustment"],
-    [/\bskirting\b/i, "Skirting work"],
-    [/\bworktop\b/i, "Worktop issue"],
-    [/\bcupboard|unit\b/i, "Cabinet / unit issue"],
-    [/\brender|repoint|gutter|downpipe\b/i, "External remedial work"],
-    [/\bpartition|stud\b/i, "Partition / stud alteration"],
-    [/\belectrics|socket|power|data\b/i, "Electrical / power / data work"],
-    [/\bpaint|painting|repaint\b/i, "Painting / redecorating"],
-    [/\bplaster|skim|plasterboard\b/i, "Plastering / making good"],
-    [/\bwindow|draught\b/i, "Window / draught issue"],
+  const patterns = [
+    /\b(?:asap|urgent|immediately|this week|next week|this month|next month|weekend|weekends|evenings|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
+    /\b(?:before|after|from)\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?\b/gi,
+    /\b(?:in\s+\d+\s+days?|within\s+\d+\s+days?|\d+\s+days?\s+after)\b/gi,
+    /\b(?:tenant due|move in|moving out|deadline|access from)\b[^.?!]{0,30}/gi,
   ];
 
-  for (const [regex, label] of patterns) {
-    if (regex.test(lower)) issues.push(label);
-  }
-
-  return unique(issues);
+  return unique(patterns.flatMap((pattern) => collectMatches(text, pattern)));
 }
 
-function detectSupply(text: string) {
+function detectCategories(text: string) {
   const lower = text.toLowerCase();
   const items: string[] = [];
 
-  if (/\bwe can supply|we'll supply|we will supply|we've got|we have got|already bought|already have\b/i.test(lower)) {
-    items.push("Client may be supplying some materials or fixtures");
-  }
+  const categories: Array<[RegExp, string]> = [
+    [/\bbathroom|shower room|wc|toilet\b/i, "Bathroom / washroom work"],
+    [/\bkitchen|worktop|sink|cupboard|unit\b/i, "Kitchen / cabinetry work"],
+    [/\bbedroom|lounge|living room|front room|hall|hallway|landing\b/i, "Internal room repairs / finishing"],
+    [/\broof|gutter|downpipe|render|repoint|window|door|elevation\b/i, "External repairs / envelope work"],
+    [/\bpartition|stud|office|fit-?out|commercial\b/i, "Commercial / fit-out work"],
+    [/\bwebsite|landing page|seo|ads|marketing|campaign|content\b/i, "Marketing / digital service work"],
+    [/\bbrand|branding|logo|design|deck|presentation\b/i, "Branding / design work"],
+    [/\bautomation|workflow|crm|zapier|notion|airtable|system\b/i, "Ops / automation work"],
+    [/\bcopywriting|email sequence|proposal|pitch|script\b/i, "Writing / communication work"],
+    [/\bconsult|strategy|advice|review|audit\b/i, "Consulting / advisory work"],
+    [/\belectric|socket|data|power|lighting\b/i, "Electrical / data work"],
+    [/\bpaint|painting|decorate|decorating|plaster|skim|making good\b/i, "Finishing / decorating work"],
+  ];
 
-  if (/\btiles\b/i.test(lower) && /\bsupply|ourselves|we can supply|we've got\b/i.test(lower)) {
-    items.push("Tiles may be client-supplied");
-  }
-
-  if (/\bdoors\b/i.test(lower) && /\bwe['’]ve got|already bought|already have\b/i.test(lower)) {
-    items.push("Doors may already be purchased by client");
-  }
-
-  if (/\blabour only\b/i.test(lower)) {
-    items.push("Labour-only pricing may be requested");
+  for (const [regex, label] of categories) {
+    if (regex.test(lower)) items.push(label);
   }
 
   return unique(items);
 }
 
-function detectConstraints(text: string) {
+function detectIssues(text: string) {
   const lower = text.toLowerCase();
   const items: string[] = [];
 
-  if (/\boccupied|tenant|tenants\b/i.test(lower)) items.push("Occupied property / tenant access constraint");
-  if (/\bevenings|after 6|after 6:30|weekend|weekends\b/i.test(lower)) items.push("Restricted access times");
-  if (/\bbefore\b|\bdue in\b|\bmove in\b|\bmoving out\b/i.test(lower)) items.push("Time-sensitive deadline");
-  if (/\boutside main office hours\b|\bweekdays only\b/i.test(lower)) items.push("Commercial access restriction");
+  const issues: Array<[RegExp, string]> = [
+    [/\bleak|leaking|escape of water|water ingress\b/i, "Leak or water ingress"],
+    [/\bdamp|moisture|wet\b/i, "Damp or moisture issue"],
+    [/\bcrack|cracking|movement\b/i, "Cracking or movement concern"],
+    [/\bsoft floor|spongy|springy|damaged floor|movement in one floor tile\b/i, "Possible floor damage"],
+    [/\bextractor|fan|ventilation\b/i, "Ventilation / extractor issue"],
+    [/\btile|tiling|retile|splashback\b/i, "Tiling work"],
+    [/\bdoor|doors|frame|threshold\b/i, "Door or frame work"],
+    [/\bskirting\b/i, "Skirting / trim work"],
+    [/\bdeadline|urgent|due in\b/i, "Urgency or deadline pressure"],
+    [/\bquote|price|estimate|ballpark|rough figure\b/i, "Pricing request"],
+    [/\bnot sure|maybe|possibly|might\b/i, "Scope uncertainty"],
+    [/\bvideo|videos|photos\b/i, "Remote quoting may be possible"],
+  ];
+
+  for (const [regex, label] of issues) {
+    if (regex.test(lower)) items.push(label);
+  }
+
+  return unique(items);
+}
+
+function detectSupplyAndCommercial(text: string) {
+  const lower = text.toLowerCase();
+  const items: string[] = [];
+
+  const rules: Array<[RegExp, string]> = [
+    [/\bwe can supply|we will supply|we'll supply|we've got|already bought|already have\b/i, "Client may be supplying some materials, assets, or inputs"],
+    [/\blabour only|labor only\b/i, "Labour-only pricing may be requested"],
+    [/\bstaged|phase|phased\b/i, "Work may need staging"],
+    [/\bdeposit|retainer|instalment|installment|payment plan\b/i, "Payment structure is relevant"],
+    [/\boccupied|tenant|staff are in|outside main office hours|weekdays only|access\b/i, "Access / occupancy constraints apply"],
+    [/\binsurance|insurer|loss adjuster\b/i, "Insurance-style documentation may be needed"],
+  ];
+
+  for (const [regex, label] of rules) {
+    if (regex.test(lower)) items.push(label);
+  }
 
   return unique(items);
 }
 
 function buildBrief(text: string) {
-  const rooms = detectRooms(text);
+  const categories = detectCategories(text);
   const issues = detectIssues(text);
   const money = extractMoney(text);
   const timing = extractTiming(text);
 
-  const roomPart = rooms.length ? `Scope appears to involve ${rooms.slice(0, 3).join(", ")}.` : "Scope involves one or more repair / refurbishment items.";
-  const issuePart = issues.length ? `Main issues include ${issues.slice(0, 4).join(", ").toLowerCase()}.` : "Main issues need clearer diagnosis.";
-  const moneyPart = money.length ? `Budget or cost references mentioned: ${money.slice(0, 2).join(", ")}.` : "";
-  const timingPart = timing.length ? `Timing constraints mentioned: ${timing.slice(0, 3).join(", ")}.` : "";
+  const parts = [
+    categories.length
+      ? `This looks like ${categories.slice(0, 2).join(" and ").toLowerCase()}.`
+      : "This looks like a service or project enquiry that needs scoping.",
+    issues.length
+      ? `Key signals include ${issues.slice(0, 4).join(", ").toLowerCase()}.`
+      : "The request needs clearer problem definition.",
+    money.length ? `Money or pricing references: ${money.slice(0, 2).join(" | ")}.` : "",
+    timing.length ? `Timing mentioned: ${timing.slice(0, 3).join(" | ")}.` : "",
+  ];
 
-  return [roomPart, issuePart, moneyPart, timingPart].filter(Boolean).join(" ");
+  return parts.filter(Boolean).join(" ");
 }
 
 function buildRequirements(text: string) {
-  const items: string[] = [];
-  const rooms = detectRooms(text);
+  const categories = detectCategories(text);
   const issues = detectIssues(text);
-  const supply = detectSupply(text);
-  const constraints = detectConstraints(text);
+  const supply = detectSupplyAndCommercial(text);
+  const measurements = extractMeasurements(text);
+  const timing = extractTiming(text);
+  const items: string[] = [];
 
-  if (rooms.length) items.push(`Areas mentioned: ${rooms.join(", ")}`);
-  if (issues.length) items.push(...issues);
-  if (supply.length) items.push(...supply);
-  if (constraints.length) items.push(...constraints);
+  items.push(...categories);
+  items.push(...issues);
+  items.push(...supply);
 
-  if (/\bquote|price|ballpark|rough figure|estimate\b/i.test(text)) items.push("Pricing / estimate requested");
-  if (/\binspect|visit|come look|site visit\b/i.test(text)) items.push("Inspection may be required before formal pricing");
-  if (/\bphotos|video|videos\b/i.test(text)) items.push("Client may provide photos or videos");
+  if (measurements.length) items.push(`Known sizes / quantities: ${measurements.slice(0, 4).join(", ")}`);
+  if (timing.length) items.push(`Timing constraints: ${timing.slice(0, 3).join(", ")}`);
+  if (/\bquote|price|estimate|ballpark|rough figure\b/i.test(text)) items.push("Pricing / estimate requested");
+  if (/\bvisit|inspect|come look|review|audit\b/i.test(text)) items.push("Inspection / review may be required before firm pricing");
+  if (/\bphotos|video|videos\b/i.test(text)) items.push("Photos or videos may be available for provisional review");
 
   return unique(items);
 }
@@ -178,22 +182,14 @@ function buildMissingInfo(text: string) {
   const money = extractMoney(text);
   const timing = extractTiming(text);
 
-  if (!measurements.length) items.push("Accurate measurements or dimensions");
-  if (!/\baddress|postcode|bristol|property|flat|terrace|house|office\b/i.test(lower)) {
-    items.push("Property type and location");
-  }
-  if (!timing.length) items.push("Preferred timing or deadline");
-  if (!money.length && !/\bbudget\b/i.test(lower)) items.push("Budget or price expectation");
-  if (!/\bphotos|video|videos\b/i.test(lower)) items.push("Photos or video of the problem areas");
-  if (!/\bsupply|suppl|already bought|already have|we've got|we have\b/i.test(lower)) {
-    items.push("Who is supplying materials, fixtures, and fittings");
-  }
-  if (/\bmaybe|not sure|possibly|might\b/i.test(lower)) {
-    items.push("Decision on final scope versus investigation-only visit");
-  }
-  if (/\binsurance|insurer|loss adjuster\b/i.test(lower)) {
-    items.push("Whether quote needs split between investigation, strip-out, and reinstatement");
-  }
+  if (!measurements.length) items.push("Accurate measurements, quantities, or scope size");
+  if (!/\baddress|postcode|location|remote|online|office|flat|house|property\b/i.test(lower)) items.push("Location or delivery context");
+  if (!timing.length) items.push("Deadline, preferred timing, or urgency");
+  if (!money.length && !/\bbudget\b/i.test(lower)) items.push("Budget, ballpark, or pricing expectation");
+  if (!/\bphotos|video|videos|brief|spec|attachment\b/i.test(lower)) items.push("Supporting material such as photos, files, or a clearer brief");
+  if (!/\bsupply|suppl|already bought|already have|we've got|we have\b/i.test(lower)) items.push("Who is supplying materials, assets, content, or inputs");
+  if (/\bmaybe|not sure|possibly|might\b/i.test(lower)) items.push("Decision on final scope versus investigation / review only");
+  if (/\bteam|trade|contractor|designer|developer|writer\b/i.test(lower) === false) items.push("Who is expected to deliver the work or whether multiple specialists are needed");
 
   return unique(items);
 }
@@ -202,23 +198,23 @@ function buildNextSteps(text: string) {
   const lower = text.toLowerCase();
   const items: string[] = [];
 
+  items.push("Request a tighter scope summary plus supporting files, photos, or examples");
+  items.push("Confirm whether the next step is a diagnosis / discovery call, site visit, or firm quote");
+
   if (/\bleak|water|damp|moisture\b/i.test(lower)) {
-    items.push("Confirm whether the leak / water source is fully resolved before pricing reinstatement");
-  }
-
-  items.push("Request photos, dimensions, and a short scope summary before pricing");
-  items.push("Decide whether this is a diagnosis visit, repair-only quote, or full refurbishment quote");
-
-  if (/\bquote from photos|videos|video|photos\b/i.test(lower)) {
-    items.push("Issue a provisional estimate from photos first, then confirm on inspection");
-  }
-
-  if (/\btenant|occupied|office|access\b/i.test(lower)) {
-    items.push("Confirm access constraints and available inspection / work windows");
+    items.push("Confirm whether the root cause is already resolved before pricing reinstatement or finish work");
   }
 
   if (/\bbudget\b|£|\b\d+\s?k\b/i.test(lower)) {
-    items.push("Check whether the requested scope fits the stated budget or needs staging");
+    items.push("Check whether the requested scope fits the stated budget or needs phasing");
+  }
+
+  if (/\btenant|occupied|staff are in|access|weekdays only|outside main office hours\b/i.test(lower)) {
+    items.push("Lock down access windows and operational constraints before scheduling work");
+  }
+
+  if (/\bphotos|video|videos\b/i.test(lower)) {
+    items.push("Provide a provisional view from photos or videos, then confirm after inspection if needed");
   }
 
   return unique(items);
@@ -247,10 +243,7 @@ export async function POST(req: Request) {
     const input = body?.input?.trim();
 
     if (!input) {
-      return NextResponse.json(
-        { error: "No input provided." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No input provided." }, { status: 400 });
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -271,7 +264,7 @@ export async function POST(req: Request) {
           {
             role: "system",
             content:
-              "You are BriefDrop. Turn messy incoming messages into a usable brief. Be concise, practical, and do not invent facts.",
+              "You are BriefDrop. Turn messy incoming messages into a usable business brief. Be concise, practical, and do not invent facts. Work for trades, agencies, consultants, service businesses, and operational teams.",
           },
           {
             role: "user",
@@ -288,35 +281,13 @@ export async function POST(req: Request) {
               additionalProperties: false,
               properties: {
                 brief: { type: "string" },
-                requirements: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                missingInfo: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                nextSteps: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                money: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                questionsFound: {
-                  type: "array",
-                  items: { type: "string" },
-                },
+                requirements: { type: "array", items: { type: "string" } },
+                missingInfo: { type: "array", items: { type: "string" } },
+                nextSteps: { type: "array", items: { type: "string" } },
+                money: { type: "array", items: { type: "string" } },
+                questionsFound: { type: "array", items: { type: "string" } },
               },
-              required: [
-                "brief",
-                "requirements",
-                "missingInfo",
-                "nextSteps",
-                "money",
-                "questionsFound",
-              ],
+              required: ["brief", "requirements", "missingInfo", "nextSteps", "money", "questionsFound"],
             },
           },
         },
@@ -333,40 +304,28 @@ export async function POST(req: Request) {
       );
     }
 
-    let text = "";
+    let textOut = "";
 
     if (typeof data.output_text === "string" && data.output_text.trim()) {
-      text = data.output_text;
+      textOut = data.output_text;
     } else if (Array.isArray(data.output)) {
-      text = data.output
+      textOut = data.output
         .flatMap((item: any) => item.content || [])
         .map((c: any) => c.text || "")
         .join("\n");
     }
 
-    if (!text) {
-      return NextResponse.json(
-        { error: "Empty response from OpenAI", raw: data },
-        { status: 500 }
-      );
+    if (!textOut) {
+      return NextResponse.json({ error: "Empty response from OpenAI", raw: data }, { status: 500 });
     }
-
-    let parsed: BriefDropResult;
 
     try {
-      parsed = JSON.parse(text) as BriefDropResult;
+      return NextResponse.json(JSON.parse(textOut) as BriefDropResult);
     } catch {
-      return NextResponse.json(
-        { error: "Model did not return valid JSON", raw: text },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Model did not return valid JSON", raw: textOut }, { status: 500 });
     }
-
-    return NextResponse.json(parsed);
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Server error";
-
+    const message = error instanceof Error ? error.message : "Server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
