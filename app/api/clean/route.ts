@@ -12,6 +12,8 @@ type BriefDropResult = {
   clientReply: string;
   followUpQuestions: string[];
   internalBrief: string;
+  quotePrep: string;
+  discoveryPrep: string;
 };
 
 function normalise(text: string) {
@@ -46,7 +48,7 @@ function extractMeasurements(text: string) {
   const patterns = [
     /\b\d+(?:\.\d+)?\s?(?:mm|cm|m|metre|metres|meter|meters|sqm|sq m|m2|square metres|square meters)\b/gi,
     /\b\d+(?:\.\d+)?\s?x\s?\d+(?:\.\d+)?\s?(?:m|metres|meters|cm|mm)?\b/gi,
-    /\b(?:\d+(?:\.\d+)?)\s?(?:bed|bedroom|bedrooms|storey|story|floor|floors|emails?)\b/gi,
+    /\b(?:\d+(?:\.\d+)?)\s?(?:bed|bedroom|bedrooms|storey|story|floor|floors|emails?|departments?)\b/gi,
   ];
   return unique(patterns.flatMap((pattern) => collectMatches(text, pattern)));
 }
@@ -56,7 +58,7 @@ function extractTiming(text: string) {
     /\b(?:asap|urgent|immediately|this week|next week|this month|next month|weekend|weekends|evenings|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
     /\b(?:before|after|from)\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?\b/gi,
     /\b(?:in\s+\d+\s+days?|within\s+\d+\s+days?|\d+\s+days?\s+after)\b/gi,
-    /\b(?:tenant due|move in|moving out|deadline|access from|review this week)\b[^.?!]{0,30}/gi,
+    /\b(?:tenant due|move in|moving out|deadline|access from|review this week|proposal before)\b[^.?!]{0,30}/gi,
   ];
   return unique(patterns.flatMap((pattern) => collectMatches(text, pattern)));
 }
@@ -73,7 +75,7 @@ function detectCategories(text: string) {
     [/\bwebsite|landing page|seo|ads|marketing|campaign|content|email sequence\b/i, "Marketing / digital service work"],
     [/\bbrand|branding|logo|design|deck|presentation\b/i, "Branding / design work"],
     [/\bautomation|workflow|crm|zapier|notion|airtable|system|handoff|intake\b/i, "Ops / automation work"],
-    [/\bcopywriting|email sequence|proposal|pitch|script\b/i, "Writing / communication work"],
+    [/\bcopywriting|proposal|pitch|script\b/i, "Writing / communication work"],
     [/\bconsult|strategy|advice|review|audit\b/i, "Consulting / advisory work"],
     [/\belectric|socket|data|power|lighting\b/i, "Electrical / data work"],
     [/\bpaint|painting|decorate|decorating|plaster|skim|making good\b/i, "Finishing / decorating work"],
@@ -216,7 +218,7 @@ function buildFollowUpQuestions(text: string) {
   return unique(items);
 }
 
-function buildClientReply(result: Omit<BriefDropResult, "clientReply" | "internalBrief">) {
+function buildClientReply(result: Omit<BriefDropResult, "clientReply" | "internalBrief" | "quotePrep" | "discoveryPrep">) {
   const lines = [
     "Thanks — this gives a solid starting point.",
     result.brief,
@@ -227,7 +229,7 @@ function buildClientReply(result: Omit<BriefDropResult, "clientReply" | "interna
   return lines.filter(Boolean).join(" ");
 }
 
-function buildInternalBrief(result: Omit<BriefDropResult, "clientReply" | "internalBrief">) {
+function buildInternalBrief(result: Omit<BriefDropResult, "clientReply" | "internalBrief" | "quotePrep" | "discoveryPrep">) {
   return [
     `BRIEF: ${result.brief}`,
     `REQUIREMENTS: ${result.requirements.join("; ") || "None"}`,
@@ -235,6 +237,28 @@ function buildInternalBrief(result: Omit<BriefDropResult, "clientReply" | "inter
     `NEXT STEPS: ${result.nextSteps.join("; ") || "None"}`,
     `MONEY: ${result.money.join("; ") || "None"}`,
     `RISKS: ${result.risks.join("; ") || "None"}`,
+  ].join("\n");
+}
+
+function buildQuotePrep(result: Omit<BriefDropResult, "clientReply" | "internalBrief" | "quotePrep" | "discoveryPrep">) {
+  return [
+    `Quote prep`,
+    `- Scope summary: ${result.brief}`,
+    `- Requirements to include: ${result.requirements.join("; ") || "None"}`,
+    `- Missing info before firm pricing: ${result.missingInfo.join("; ") || "None"}`,
+    `- Price signals: ${result.money.join("; ") || "None"}`,
+    `- Risks: ${result.risks.join("; ") || "None"}`,
+  ].join("\n");
+}
+
+function buildDiscoveryPrep(result: Omit<BriefDropResult, "clientReply" | "internalBrief" | "quotePrep" | "discoveryPrep">) {
+  return [
+    `Discovery prep`,
+    `- Core brief: ${result.brief}`,
+    `- Main unknowns: ${result.missingInfo.join("; ") || "None"}`,
+    `- Key questions to ask: ${result.followUpQuestions.join("; ") || "None"}`,
+    `- Assumptions to test: ${result.assumptions.join("; ") || "None"}`,
+    `- Risks / blockers: ${result.risks.join("; ") || "None"}`,
   ].join("\n");
 }
 
@@ -255,6 +279,8 @@ function smartFallback(input: string): BriefDropResult {
     ...partial,
     clientReply: buildClientReply(partial),
     internalBrief: buildInternalBrief(partial),
+    quotePrep: buildQuotePrep(partial),
+    discoveryPrep: buildDiscoveryPrep(partial),
   };
 }
 
@@ -308,13 +334,15 @@ export async function POST(req: Request) {
                 assumptions: { type: "array", items: { type: "string" } },
                 clientReply: { type: "string" },
                 followUpQuestions: { type: "array", items: { type: "string" } },
-                internalBrief: { type: "string" }
+                internalBrief: { type: "string" },
+                quotePrep: { type: "string" },
+                discoveryPrep: { type: "string" }
               },
-              required: ["brief", "requirements", "missingInfo", "nextSteps", "money", "questionsFound", "risks", "assumptions", "clientReply", "followUpQuestions", "internalBrief"],
+              required: ["brief", "requirements", "missingInfo", "nextSteps", "money", "questionsFound", "risks", "assumptions", "clientReply", "followUpQuestions", "internalBrief", "quotePrep", "discoveryPrep"],
             },
           },
         },
-        max_output_tokens: 900,
+        max_output_tokens: 1000,
       }),
     });
 
@@ -323,9 +351,7 @@ export async function POST(req: Request) {
 
     let textOut = "";
     if (typeof data.output_text === "string" && data.output_text.trim()) textOut = data.output_text;
-    else if (Array.isArray(data.output)) {
-      textOut = data.output.flatMap((item: any) => item.content || []).map((c: any) => c.text || "").join("\n");
-    }
+    else if (Array.isArray(data.output)) textOut = data.output.flatMap((item: any) => item.content || []).map((c: any) => c.text || "").join("\n");
     if (!textOut) return NextResponse.json({ error: "Empty response from OpenAI", raw: data }, { status: 500 });
     try {
       return NextResponse.json(JSON.parse(textOut) as BriefDropResult);
