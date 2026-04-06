@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type BriefDropResult = {
   brief: string;
@@ -14,7 +14,11 @@ type BriefDropResult = {
   clientReply: string;
   followUpQuestions: string[];
   internalBrief: string;
+  quotePrep: string;
+  discoveryPrep: string;
 };
+
+type OutputMode = "brief" | "reply" | "internal" | "quote" | "discovery";
 
 const samples = {
   trades:
@@ -25,6 +29,14 @@ const samples = {
     "We need help cleaning up our operations handover. At the moment tasks are split across Slack, email, and Notion. We need someone to map the current process, identify gaps, and propose a cleaner intake and handoff workflow. There are 3 departments involved and we need a proposal before next Friday. Budget is not fixed yet but probably under £5k. Can you tell us what information you’d need to scope this properly?",
 };
 
+const modeLabels: Record<OutputMode, string> = {
+  brief: "Brief",
+  reply: "Client Reply",
+  internal: "Internal Brief",
+  quote: "Quote Prep",
+  discovery: "Discovery Prep",
+};
+
 export default function Page() {
   const [input, setInput] = useState(samples.service);
   const [loading, setLoading] = useState(false);
@@ -32,6 +44,7 @@ export default function Page() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [copied, setCopied] = useState("");
+  const [mode, setMode] = useState<OutputMode>("brief");
 
   async function handleClean() {
     setLoading(true);
@@ -67,6 +80,15 @@ export default function Page() {
     setTimeout(() => setCopied(""), 1500);
   }
 
+  const activeOutput = useMemo(() => {
+    if (!result) return "";
+    if (mode === "reply") return result.clientReply;
+    if (mode === "internal") return result.internalBrief;
+    if (mode === "quote") return result.quotePrep;
+    if (mode === "discovery") return result.discoveryPrep;
+    return result.brief;
+  }, [mode, result]);
+
   function buildFullCopy() {
     if (!result) return input;
     return [
@@ -81,28 +103,43 @@ export default function Page() {
       `\nFollow-up questions:\n- ${result.followUpQuestions.join("\n- ") || "None"}`,
       `\nClient reply:\n${result.clientReply}`,
       `\nInternal brief:\n${result.internalBrief}`,
+      `\nQuote prep:\n${result.quotePrep}`,
+      `\nDiscovery prep:\n${result.discoveryPrep}`,
     ].join("\n");
   }
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-10">
-          <div className="inline-flex rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-xs font-medium text-teal-300">
-            BriefDrop Universal
+        <section className="mb-8 rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-black/20 md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-3xl border border-teal-400/20 bg-teal-400/10">
+                <div className="h-7 w-7 rounded-full bg-teal-400 shadow-[0_0_28px_rgba(20,184,166,0.45)]" />
+              </div>
+              <div>
+                <div className="text-2xl font-semibold tracking-tight md:text-3xl">BriefDrop</div>
+                <div className="text-sm text-slate-400">Turn messy inbound into a decision-ready intake pack.</div>
+              </div>
+            </div>
+            <div className="inline-flex rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-teal-300">
+              Universal intake tool
+            </div>
           </div>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight md:text-6xl">
-            Paste the messages. Get the brief.
-          </h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300 md:text-lg">
-            BriefDrop turns messy enquiries, chats, emails, notes, and rough scopes into a usable brief, clearer requirements, pricing signals, follow-up questions, and next steps.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2 text-sm">
-            <button onClick={() => setInput(samples.trades)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:border-teal-400">Use trades sample</button>
-            <button onClick={() => setInput(samples.service)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:border-teal-400">Use service sample</button>
-            <button onClick={() => setInput(samples.ops)} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:border-teal-400">Use ops sample</button>
+
+          <div className="mt-6 max-w-4xl">
+            <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">Paste the messages. Get the brief.</h1>
+            <p className="mt-4 text-base leading-7 text-slate-300 md:text-lg">
+              BriefDrop cleans up chats, emails, notes, and rough scopes into structured outputs you can actually use: brief, pricing signals, follow-up questions, quote prep, discovery prep, and handover-ready notes.
+            </p>
           </div>
-        </div>
+
+          <div className="mt-6 flex flex-wrap gap-2 text-sm">
+            <button onClick={() => setInput(samples.trades)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 hover:border-teal-400">Use trades sample</button>
+            <button onClick={() => setInput(samples.service)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 hover:border-teal-400">Use service sample</button>
+            <button onClick={() => setInput(samples.ops)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 hover:border-teal-400">Use ops sample</button>
+          </div>
+        </section>
 
         <div className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
           <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-black/20">
@@ -122,47 +159,68 @@ export default function Page() {
                 Clear
               </button>
               <button onClick={() => copyText("full", buildFullCopy())} className="rounded-2xl border border-teal-400/40 px-5 py-3 text-sm font-semibold text-teal-300 hover:border-teal-300">
-                {copied === "full" ? "Copied" : "Copy output"}
+                {copied === "full" ? "Copied" : "Copy pack"}
               </button>
             </div>
             {status && !error && <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">{status}</div>}
           </section>
 
           <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-black/20">
-            <div className="mb-3 text-sm font-semibold text-white">Cleaned output</div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-white">Intake pack</div>
+                <div className="text-xs text-slate-400">Structured outputs for decision, response, pricing, and handover.</div>
+              </div>
+              {result && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setMode(item)}
+                      className={`rounded-full px-3 py-2 font-semibold ${mode === item ? "bg-teal-400 text-slate-950" : "border border-slate-700 bg-slate-950 text-slate-300"}`}
+                    >
+                      {modeLabels[item]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {error ? (
               <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>
             ) : !result ? (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950 p-6 text-sm leading-7 text-slate-400">Hit <span className="text-slate-200">Clean this up</span> to generate the structured brief.</div>
             ) : (
               <div className="space-y-4">
-                <Card title="Brief" emphasis>
-                  <p className="text-sm leading-7 text-slate-100">{result.brief}</p>
+                <Card title={modeLabels[mode]} emphasis>
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-slate-100">{activeOutput}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <SmallCopyButton label={mode} text={activeOutput} copied={copied} onCopy={copyText} buttonText={`Copy ${modeLabels[mode]}`} />
+                    <SmallCopyButton label="reply" text={result.clientReply} copied={copied} onCopy={copyText} buttonText="Copy client reply" />
+                    <SmallCopyButton label="internal" text={result.internalBrief} copied={copied} onCopy={copyText} buttonText="Copy internal brief" />
+                  </div>
                 </Card>
-                <Card title="Requirements"><BulletList items={result.requirements} empty="No clear requirements found." /></Card>
-                <Card title="Missing info"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></Card>
-                <Card title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></Card>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card title="Requirements"><BulletList items={result.requirements} empty="No clear requirements found." /></Card>
+                  <Card title="Missing info"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></Card>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></Card>
+                  <Card title="Follow-up questions">
+                    <BulletList items={result.followUpQuestions} empty="No follow-up questions found." />
+                  </Card>
+                </div>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <Card title="Money / pricing"><BulletList items={result.money} empty="No money references found." /></Card>
                   <Card title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></Card>
                 </div>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <Card title="Risks / blockers"><BulletList items={result.risks} empty="No major blockers found." /></Card>
                   <Card title="Assumptions"><BulletList items={result.assumptions} empty="No major assumptions found." /></Card>
-                </div>
-                <Card title="Follow-up questions">
-                  <BulletList items={result.followUpQuestions} empty="No follow-up questions found." />
-                  <div className="mt-3"><SmallCopyButton label="followups" text={result.followUpQuestions.join("\n")} copied={copied} onCopy={copyText} buttonText="Copy follow-up questions" /></div>
-                </Card>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <Card title="Client reply draft">
-                    <p className="text-sm leading-7 text-slate-200 whitespace-pre-wrap">{result.clientReply}</p>
-                    <div className="mt-3"><SmallCopyButton label="reply" text={result.clientReply} copied={copied} onCopy={copyText} buttonText="Copy client reply" /></div>
-                  </Card>
-                  <Card title="Internal brief">
-                    <p className="text-sm leading-7 text-slate-200 whitespace-pre-wrap">{result.internalBrief}</p>
-                    <div className="mt-3"><SmallCopyButton label="internal" text={result.internalBrief} copied={copied} onCopy={copyText} buttonText="Copy internal brief" /></div>
-                  </Card>
                 </div>
               </div>
             )}
