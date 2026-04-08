@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+type DecisionLevel = "low" | "medium" | "high";
+type QuoteReadiness = "ready for rough estimate" | "follow-up needed" | "inspection needed" | "not enough information";
+type BudgetSignal = "present" | "missing";
+
 type BriefDropResult = {
   brief: string;
   requirements: string[];
@@ -16,6 +20,10 @@ type BriefDropResult = {
   internalBrief: string;
   quotePrep: string;
   discoveryPrep: string;
+  quoteReadiness: QuoteReadiness;
+  budgetSignal: BudgetSignal;
+  urgency: DecisionLevel;
+  scopeClarity: DecisionLevel;
 };
 
 type OutputMode = "brief" | "reply" | "internal" | "quote" | "discovery";
@@ -37,6 +45,10 @@ const modeLabels: Record<OutputMode, string> = {
   discovery: "Discovery Prep",
 };
 
+function titleCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default function Page() {
   const [input, setInput] = useState(samples.service);
   const [loading, setLoading] = useState(false);
@@ -45,6 +57,7 @@ export default function Page() {
   const [status, setStatus] = useState("");
   const [copied, setCopied] = useState("");
   const [mode, setMode] = useState<OutputMode>("brief");
+  const [showOriginal, setShowOriginal] = useState(false);
 
   async function handleClean() {
     setLoading(true);
@@ -92,7 +105,8 @@ export default function Page() {
   function buildFullCopy() {
     if (!result) return input;
     return [
-      `Brief:\n${result.brief}`,
+      `Decision strip:\nQuote readiness: ${result.quoteReadiness}\nBudget signal: ${result.budgetSignal}\nUrgency: ${result.urgency}\nScope clarity: ${result.scopeClarity}`,
+      `\nBrief:\n${result.brief}`,
       `\nRequirements:\n- ${result.requirements.join("\n- ") || "None"}`,
       `\nMissing info:\n- ${result.missingInfo.join("\n- ") || "None"}`,
       `\nNext steps:\n- ${result.nextSteps.join("\n- ") || "None"}`,
@@ -162,6 +176,16 @@ export default function Page() {
                 {copied === "full" ? "Copied" : "Copy pack"}
               </button>
             </div>
+            <div className="mt-4">
+              <button onClick={() => setShowOriginal((v) => !v)} className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-teal-400">
+                {showOriginal ? "Hide original input" : "Show original input"}
+              </button>
+            </div>
+            {showOriginal && (
+              <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm leading-7 text-slate-300 whitespace-pre-wrap">
+                {input}
+              </div>
+            )}
             {status && !error && <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">{status}</div>}
           </section>
 
@@ -192,6 +216,13 @@ export default function Page() {
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950 p-6 text-sm leading-7 text-slate-400">Hit <span className="text-slate-200">Clean this up</span> to generate the structured brief.</div>
             ) : (
               <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <DecisionCard label="Quote readiness" value={titleCase(result.quoteReadiness)} />
+                  <DecisionCard label="Budget signal" value={titleCase(result.budgetSignal)} />
+                  <DecisionCard label="Urgency" value={titleCase(result.urgency)} />
+                  <DecisionCard label="Scope clarity" value={titleCase(result.scopeClarity)} />
+                </div>
+
                 <Card title={modeLabels[mode]} emphasis>
                   <p className="whitespace-pre-wrap text-sm leading-7 text-slate-100">{activeOutput}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -208,9 +239,7 @@ export default function Page() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <Card title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></Card>
-                  <Card title="Follow-up questions">
-                    <BulletList items={result.followUpQuestions} empty="No follow-up questions found." />
-                  </Card>
+                  <Card title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></Card>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -236,6 +265,15 @@ function Card({ title, children, emphasis = false }: { title: string; children: 
     <div className={`rounded-2xl border p-4 ${emphasis ? "border-teal-400/30 bg-slate-950" : "border-slate-800 bg-slate-950"}`}>
       <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{title}</div>
       {children}
+    </div>
+  );
+}
+
+function DecisionCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</div>
+      <div className="text-sm font-semibold text-slate-100">{value}</div>
     </div>
   );
 }
