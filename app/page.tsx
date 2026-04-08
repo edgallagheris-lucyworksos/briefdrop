@@ -71,12 +71,7 @@ export default function Page() {
         body: JSON.stringify({ input }),
       });
       const raw = await res.text();
-      let data: any;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        throw new Error(`Server returned non-JSON response: ${raw.slice(0, 200)}`);
-      }
+      const data = JSON.parse(raw);
       if (!res.ok) throw new Error(data?.error || "Something went wrong");
       setResult(data);
       setStatus(`Status ${res.status} · Parsed successfully`);
@@ -88,9 +83,13 @@ export default function Page() {
   }
 
   async function copyText(label: string, text: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(label);
-    setTimeout(() => setCopied(""), 1500);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(""), 1400);
+    } catch {
+      setError("Clipboard copy failed in this browser.");
+    }
   }
 
   const activeOutput = useMemo(() => {
@@ -123,136 +122,113 @@ export default function Page() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 md:px-8">
-      <div className="mx-auto max-w-7xl">
-        <section className="mb-8 rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-black/20 md:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl border border-teal-400/20 bg-teal-400/10">
-                <div className="h-7 w-7 rounded-full bg-teal-400 shadow-[0_0_28px_rgba(20,184,166,0.45)]" />
-              </div>
+    <main className="bd-page">
+      <div className="bd-shell">
+        <section className="bd-card bd-hero">
+          <div className="bd-hero-top">
+            <div className="bd-brand">
+              <div className="bd-mark"><span /></div>
               <div>
-                <div className="text-2xl font-semibold tracking-tight md:text-3xl">BriefDrop</div>
-                <div className="text-sm text-slate-400">Turn messy inbound into a decision-ready intake pack.</div>
+                <div className="bd-name">BriefDrop</div>
+                <div className="bd-tag">Turn messy inbound into a decision-ready intake pack.</div>
               </div>
             </div>
-            <div className="inline-flex rounded-full border border-teal-400/30 bg-teal-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-teal-300">
-              Universal intake tool
-            </div>
+            <div className="bd-badge">Universal intake tool</div>
           </div>
 
-          <div className="mt-6 max-w-4xl">
-            <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">Paste the messages. Get the brief.</h1>
-            <p className="mt-4 text-base leading-7 text-slate-300 md:text-lg">
-              BriefDrop cleans up chats, emails, notes, and rough scopes into structured outputs you can actually use: brief, pricing signals, follow-up questions, quote prep, discovery prep, and handover-ready notes.
-            </p>
+          <div className="bd-hero-copy">
+            <h1>Paste the messages. Get the brief.</h1>
+            <p>BriefDrop turns chats, emails, notes, and rough scopes into usable work outputs: brief, pricing signals, follow-up questions, quote prep, discovery prep, and handover-ready notes.</p>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-2 text-sm">
-            <button onClick={() => setInput(samples.trades)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 hover:border-teal-400">Use trades sample</button>
-            <button onClick={() => setInput(samples.service)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 hover:border-teal-400">Use service sample</button>
-            <button onClick={() => setInput(samples.ops)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 hover:border-teal-400">Use ops sample</button>
+          <div className="bd-chip-row">
+            <button className="bd-chip" onClick={() => setInput(samples.trades)}>Use trades sample</button>
+            <button className="bd-chip" onClick={() => setInput(samples.service)}>Use service sample</button>
+            <button className="bd-chip" onClick={() => setInput(samples.ops)}>Use ops sample</button>
           </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
-          <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-black/20">
-            <div className="mb-3 text-sm font-semibold text-white">Paste messages or notes</div>
-            <div className="mb-4 text-xs text-slate-400">Use anything: WhatsApp, email, voice-note transcript, sales enquiry, internal notes, rough scope.</div>
+        <div className="bd-grid">
+          <section className="bd-card bd-panel">
+            <div className="bd-panel-head">
+              <div className="bd-panel-title">Paste messages or notes</div>
+              <div className="bd-panel-sub">Use anything: WhatsApp, email, voice-note transcript, sales enquiry, internal notes, rough scope.</div>
+            </div>
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="min-h-[360px] w-full rounded-2xl border border-slate-700 bg-slate-950 p-4 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-teal-400"
+              className="bd-textarea"
               placeholder="Paste anything here..."
             />
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button onClick={handleClean} disabled={loading} className="rounded-2xl bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:opacity-90 disabled:opacity-50">
-                {loading ? "Cleaning..." : "Clean this up"}
-              </button>
-              <button onClick={() => { setInput(""); setResult(null); setError(""); setStatus(""); }} className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 hover:border-slate-500">
-                Clear
-              </button>
-              <button onClick={() => copyText("full", buildFullCopy())} className="rounded-2xl border border-teal-400/40 px-5 py-3 text-sm font-semibold text-teal-300 hover:border-teal-300">
-                {copied === "full" ? "Copied" : "Copy pack"}
-              </button>
+
+            <div className="bd-actions">
+              <button onClick={handleClean} disabled={loading} className="bd-btn bd-btn-primary">{loading ? "Cleaning..." : "Clean this up"}</button>
+              <button onClick={() => { setInput(""); setResult(null); setError(""); setStatus(""); }} className="bd-btn bd-btn-secondary">Clear</button>
+              <button onClick={() => copyText("full", buildFullCopy())} className="bd-btn bd-btn-secondary">{copied === "full" ? "Copied" : "Copy pack"}</button>
             </div>
-            <div className="mt-4">
-              <button onClick={() => setShowOriginal((v) => !v)} className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-teal-400">
-                {showOriginal ? "Hide original input" : "Show original input"}
-              </button>
+
+            <div className="bd-actions bd-actions-tight">
+              <button onClick={() => setShowOriginal((v) => !v)} className="bd-btn bd-btn-small">{showOriginal ? "Hide original input" : "Show original input"}</button>
             </div>
-            {showOriginal && (
-              <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm leading-7 text-slate-300 whitespace-pre-wrap">
-                {input}
-              </div>
-            )}
-            {status && !error && <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">{status}</div>}
+
+            {showOriginal && <div className="bd-original">{input}</div>}
+            {status && !error && <div className="bd-status">{status}</div>}
+            {error && <div className="bd-error">{error}</div>}
           </section>
 
-          <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-black/20">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <section className="bd-card bd-panel">
+            <div className="bd-panel-head bd-panel-head-row">
               <div>
-                <div className="text-sm font-semibold text-white">Intake pack</div>
-                <div className="text-xs text-slate-400">Structured outputs for decision, response, pricing, and handover.</div>
+                <div className="bd-panel-title">Intake pack</div>
+                <div className="bd-panel-sub">Structured outputs for decision, response, pricing, and handover.</div>
               </div>
               {result && (
-                <div className="flex flex-wrap gap-2 text-xs">
+                <div className="bd-mode-row">
                   {(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setMode(item)}
-                      className={`rounded-full px-3 py-2 font-semibold ${mode === item ? "bg-teal-400 text-slate-950" : "border border-slate-700 bg-slate-950 text-slate-300"}`}
-                    >
-                      {modeLabels[item]}
-                    </button>
+                    <button key={item} onClick={() => setMode(item)} className={mode === item ? "bd-mode is-active" : "bd-mode"}>{modeLabels[item]}</button>
                   ))}
                 </div>
               )}
             </div>
 
-            {error ? (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>
-            ) : !result ? (
-              <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950 p-6 text-sm leading-7 text-slate-400">Hit <span className="text-slate-200">Clean this up</span> to generate the structured brief.</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-2">
+            {!result && !error ? (
+              <div className="bd-empty">Hit <strong>Clean this up</strong> to generate the structured brief.</div>
+            ) : result ? (
+              <div className="bd-stack">
+                <div className="bd-summary-grid">
                   <DecisionCard label="Quote readiness" value={titleCase(result.quoteReadiness)} />
                   <DecisionCard label="Budget signal" value={titleCase(result.budgetSignal)} />
                   <DecisionCard label="Urgency" value={titleCase(result.urgency)} />
                   <DecisionCard label="Scope clarity" value={titleCase(result.scopeClarity)} />
                 </div>
 
-                <Card title={modeLabels[mode]} emphasis>
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-slate-100">{activeOutput}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <SmallCopyButton label={mode} text={activeOutput} copied={copied} onCopy={copyText} buttonText={`Copy ${modeLabels[mode]}`} />
-                    <SmallCopyButton label="reply" text={result.clientReply} copied={copied} onCopy={copyText} buttonText="Copy client reply" />
-                    <SmallCopyButton label="internal" text={result.internalBrief} copied={copied} onCopy={copyText} buttonText="Copy internal brief" />
+                <SectionCard title={modeLabels[mode]} emphasis>
+                  <p className="bd-copy">{activeOutput}</p>
+                  <div className="bd-actions bd-actions-tight">
+                    <button onClick={() => copyText(mode, activeOutput)} className="bd-btn bd-btn-small">{copied === mode ? "Copied" : `Copy ${modeLabels[mode]}`}</button>
+                    <button onClick={() => copyText("reply", result.clientReply)} className="bd-btn bd-btn-small">{copied === "reply" ? "Copied" : "Copy client reply"}</button>
+                    <button onClick={() => copyText("internal", result.internalBrief)} className="bd-btn bd-btn-small">{copied === "internal" ? "Copied" : "Copy internal brief"}</button>
                   </div>
-                </Card>
+                </SectionCard>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card title="Requirements"><BulletList items={result.requirements} empty="No clear requirements found." /></Card>
-                  <Card title="Missing info"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></Card>
+                <div className="bd-section-label">Understand</div>
+                <div className="bd-two-col">
+                  <SectionCard title="Requirements"><BulletList items={result.requirements} empty="No clear requirements found." /></SectionCard>
+                  <SectionCard title="Missing info"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></SectionCard>
+                  <SectionCard title="Risks / blockers"><BulletList items={result.risks} empty="No major blockers found." /></SectionCard>
+                  <SectionCard title="Assumptions"><BulletList items={result.assumptions} empty="No major assumptions found." /></SectionCard>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></Card>
-                  <Card title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></Card>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card title="Money / pricing"><BulletList items={result.money} empty="No money references found." /></Card>
-                  <Card title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></Card>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card title="Risks / blockers"><BulletList items={result.risks} empty="No major blockers found." /></Card>
-                  <Card title="Assumptions"><BulletList items={result.assumptions} empty="No major assumptions found." /></Card>
+                <div className="bd-section-label">Act</div>
+                <div className="bd-two-col">
+                  <SectionCard title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></SectionCard>
+                  <SectionCard title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></SectionCard>
+                  <SectionCard title="Money / pricing"><BulletList items={result.money} empty="No money references found." /></SectionCard>
+                  <SectionCard title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>
                 </div>
               </div>
-            )}
+            ) : null}
           </section>
         </div>
       </div>
@@ -260,33 +236,25 @@ export default function Page() {
   );
 }
 
-function Card({ title, children, emphasis = false }: { title: string; children: React.ReactNode; emphasis?: boolean; }) {
+function DecisionCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-2xl border p-4 ${emphasis ? "border-teal-400/30 bg-slate-950" : "border-slate-800 bg-slate-950"}`}>
-      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{title}</div>
+    <div className="bd-summary-card">
+      <div className="bd-summary-label">{label}</div>
+      <div className="bd-summary-value">{value}</div>
+    </div>
+  );
+}
+
+function SectionCard({ title, children, emphasis = false }: { title: string; children: React.ReactNode; emphasis?: boolean }) {
+  return (
+    <div className={emphasis ? "bd-subcard bd-subcard-emphasis" : "bd-subcard"}>
+      <div className="bd-subcard-title">{title}</div>
       {children}
     </div>
   );
 }
 
-function DecisionCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</div>
-      <div className="text-sm font-semibold text-slate-100">{value}</div>
-    </div>
-  );
-}
-
-function BulletList({ items, empty }: { items: string[]; empty: string; }) {
-  if (!items || items.length === 0) return <div className="text-sm text-slate-400">{empty}</div>;
-  return (
-    <ul className="space-y-2 text-sm text-slate-200">
-      {items.map((item, index) => <li key={`${item}-${index}`} className="rounded-xl bg-slate-900 px-3 py-2 leading-6">{item}</li>)}
-    </ul>
-  );
-}
-
-function SmallCopyButton({ label, text, copied, onCopy, buttonText }: { label: string; text: string; copied: string; onCopy: (label: string, text: string) => Promise<void>; buttonText: string; }) {
-  return <button onClick={() => onCopy(label, text)} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-teal-400">{copied === label ? "Copied" : buttonText}</button>;
+function BulletList({ items, empty }: { items: string[]; empty: string }) {
+  if (!items || items.length === 0) return <div className="bd-muted">{empty}</div>;
+  return <ul className="bd-list">{items.map((item, index) => <li key={`${item}-${index}`} className="bd-list-item">{item}</li>)}</ul>;
 }
