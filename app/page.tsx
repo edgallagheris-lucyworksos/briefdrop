@@ -29,20 +29,20 @@ type BriefDropResult = {
 type OutputMode = "brief" | "reply" | "internal" | "quote" | "discovery";
 
 const samples = {
-  trades:
-    "Need help pricing a rental flat turnaround. It’s a 2-bed first floor flat, roughly 58 to 62 square metres total. We’ve got a list from the outgoing inspection but it’s messy. Bedroom 1 needs a wall repaired where shelving’s been ripped out, maybe skim not patch fill. Lounge has two bad stains on the ceiling from an old leak that has apparently been fixed but needs checking. Kitchen worktop edge has swollen near the sink and there’s a cracked tile in the splashback. Bathroom sealant is black and there’s movement in one floor tile by the WC. Also need 3 internal doors eased because they catch. We do not need top-spec finish, just clean and durable for reletting. Budget around £1,800 all in, maybe stretch to £2,400 if it genuinely needs more. Access from Monday, tenant due in 12 days after. Can you break down what is urgent, what is cosmetic, and whether this sounds like one trade or several? Also if we send videos, can you quote provisionally before a visit?",
-  service:
-    "Need a quote for a landing page rewrite and email sequence for a new service launch. We need better positioning, 5 emails, and a tighter offer page. Budget is around £1,500 to £2,500. We have rough notes but no proper brief yet. Can you review this week and tell us what you need first?",
-  commercial:
-    "Need help replying to a payment dispute. We have a chain of WhatsApp messages, two invoices, and a customer saying some extras were not agreed even though the work was requested in messages. I need a clear chronology, key facts extracted, issues list, and two draft responses: one open commercial response and one without prejudice settlement-style draft. I do not want anything overstated. I want missing evidence flagged, weak points flagged, and wording that stays firm without creating liability. There may also be late payment wording to add if appropriate.",
+  site:
+    "Need help pricing a rental flat turnaround. It’s a 2-bed first floor flat, roughly 58 to 62 square metres total. We’ve got a messy outgoing inspection list. Bedroom 1 needs a wall repaired where shelving was ripped out. Lounge has bad stains on the ceiling from an old leak that has apparently been fixed but needs checking. Kitchen worktop edge has swollen near the sink. Bathroom sealant is black and there’s movement in one floor tile by the WC. Budget around £1,800 all in, maybe stretch to £2,400 if needed. Access from Monday, tenant due in 12 days. Break down what is urgent, what is cosmetic, and whether this sounds like one trade or several.",
+  services:
+    "Need a quote for a landing page rewrite and email sequence for a new service launch. We need better positioning, 5 emails, and a tighter offer page. Budget is around £1,500 to £2,500. We have rough notes but no proper brief yet. Review this week and tell us what is missing before a proper proposal.",
+  disputes:
+    "Need help replying to a payment dispute. We have a chain of WhatsApp messages, two invoices, and a customer saying some extras were not agreed even though the work was requested in messages. I need a clear chronology, key facts extracted, issues list, and two draft responses: one open commercial response and one without prejudice settlement-style draft. I do not want anything overstated. I want missing evidence flagged, weak points flagged, and wording that stays firm without creating liability.",
 };
 
 const modeLabels: Record<OutputMode, string> = {
-  brief: "Scope",
+  brief: "Position",
   reply: "Reply",
   internal: "Internal",
   quote: "Commercial",
-  discovery: "Dispute / Discovery",
+  discovery: "Evidence",
 };
 
 function titleCase(value: string) {
@@ -50,7 +50,7 @@ function titleCase(value: string) {
 }
 
 export default function Page() {
-  const [input, setInput] = useState(samples.service);
+  const [input, setInput] = useState(samples.services);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BriefDropResult | null>(null);
   const [error, setError] = useState("");
@@ -59,7 +59,7 @@ export default function Page() {
   const [mode, setMode] = useState<OutputMode>("brief");
   const [showOriginal, setShowOriginal] = useState(false);
 
-  async function handleClean() {
+  async function handleBuild() {
     setLoading(true);
     setError("");
     setStatus("");
@@ -74,7 +74,7 @@ export default function Page() {
       const data = JSON.parse(raw);
       if (!res.ok) throw new Error(data?.error || "Something went wrong");
       setResult(data);
-      setStatus(`Status ${res.status} · Parsed successfully`);
+      setStatus(`Status ${res.status} · Output built`);
     } catch (err: any) {
       setError(err.message || "Failed to build output");
     } finally {
@@ -105,19 +105,18 @@ export default function Page() {
     if (!result) return input;
     return [
       `Decision strip:\nQuote readiness: ${result.quoteReadiness}\nBudget signal: ${result.budgetSignal}\nUrgency: ${result.urgency}\nScope clarity: ${result.scopeClarity}`,
-      `\nScope:\n${result.brief}`,
-      `\nRequirements:\n- ${result.requirements.join("\n- ") || "None"}`,
-      `\nMissing info:\n- ${result.missingInfo.join("\n- ") || "None"}`,
+      `\nPosition:\n${result.brief}`,
+      `\nRequirements / issues:\n- ${result.requirements.join("\n- ") || "None"}`,
+      `\nMissing info / evidence gaps:\n- ${result.missingInfo.join("\n- ") || "None"}`,
       `\nNext steps:\n- ${result.nextSteps.join("\n- ") || "None"}`,
       `\nMoney / pricing:\n- ${result.money.join("\n- ") || "None"}`,
       `\nQuestions found:\n- ${result.questionsFound.join("\n- ") || "None"}`,
       `\nRisks / blockers:\n- ${result.risks.join("\n- ") || "None"}`,
       `\nAssumptions:\n- ${result.assumptions.join("\n- ") || "None"}`,
-      `\nFollow-up questions:\n- ${result.followUpQuestions.join("\n- ") || "None"}`,
       `\nReply draft:\n${result.clientReply}`,
       `\nInternal brief:\n${result.internalBrief}`,
       `\nCommercial draft:\n${result.quotePrep}`,
-      `\nDispute / discovery draft:\n${result.discoveryPrep}`,
+      `\nEvidence / dispute draft:\n${result.discoveryPrep}`,
       `\nNote:\nBriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, or regulated professional advice. Review facts, figures, attachments, and final wording before sending or relying on it.`,
     ].join("\n");
   }
@@ -129,41 +128,42 @@ export default function Page() {
           <div className="bd-hero-top">
             <div className="bd-brand">
               <div className="bd-mark" aria-hidden="true">
-                <span className="bd-mark-drop" />
-                <span className="bd-mark-signal bd-mark-signal-a" />
-                <span className="bd-mark-signal bd-mark-signal-b" />
+                <span className="bd-mark-core" />
+                <span className="bd-mark-bar bd-mark-bar-a" />
+                <span className="bd-mark-bar bd-mark-bar-b" />
+                <span className="bd-mark-bar bd-mark-bar-c" />
               </div>
               <div>
                 <div className="bd-name">BriefDrop</div>
-                <div className="bd-tag">Structure the facts. Draft the next move.</div>
+                <div className="bd-tag">Clarify scope. Draft response. Reduce risk.</div>
               </div>
             </div>
-            <div className="bd-badge">Structured drafting tool</div>
+            <div className="bd-badge">Control surface for messy inbound</div>
           </div>
 
           <div className="bd-hero-copy">
             <h1>Turn messy inbound into a clear position.</h1>
-            <p>BriefDrop helps turn chats, emails, notes, and rough scopes into usable working outputs: scope, reply draft, commercial wording, dispute prep, missing evidence, and next actions.</p>
+            <p>Built for scope, fees, disputes, and internal handover. Facts up front. Gaps visible. Next move clear.</p>
           </div>
 
           <div className="bd-lane-grid">
-            <SampleCard title="Trades & site" text="Quotes, repairs, snagging, access, materials, measurements." onClick={() => setInput(samples.trades)} />
-            <SampleCard title="Services & proposals" text="Deliverables, timelines, revisions, client inputs, fees." onClick={() => setInput(samples.service)} />
-            <SampleCard title="Disputes & commercial" text="Facts, chronology, payment issues, protected wording, response drafts." onClick={() => setInput(samples.commercial)} />
+            <LaneCard title="Site & scope" text="Quotes, access, measurements, materials, snagging, exclusions." onClick={() => setInput(samples.site)} active />
+            <LaneCard title="Services & fees" text="Deliverables, revisions, client inputs, fee framing, scope drift." onClick={() => setInput(samples.services)} />
+            <LaneCard title="Disputes & position" text="Chronology, payment issues, evidence gaps, response drafts." onClick={() => setInput(samples.disputes)} />
           </div>
         </section>
 
         <div className="bd-grid">
           <section className="bd-panel bd-card">
             <div className="bd-panel-head">
-              <div className="bd-panel-title">Source material in</div>
-              <div className="bd-panel-sub">Paste messages, emails, notes, call summaries, complaint chains, quote requests, or internal handover text.</div>
+              <div className="bd-panel-title">Source material</div>
+              <div className="bd-panel-sub">Paste messages, emails, notes, complaint chains, quote requests, or internal handover text.</div>
             </div>
 
             <textarea value={input} onChange={(e) => setInput(e.target.value)} className="bd-textarea" placeholder="Paste the source material here..." />
 
             <div className="bd-actions">
-              <button onClick={handleClean} disabled={loading} className="bd-btn bd-btn-primary">{loading ? "Working..." : "Build output"}</button>
+              <button onClick={handleBuild} disabled={loading} className="bd-btn bd-btn-primary">{loading ? "Building..." : "Build output"}</button>
               <button onClick={() => { setInput(""); setResult(null); setError(""); setStatus(""); }} className="bd-btn bd-btn-secondary">Clear</button>
               <button onClick={() => copyText("full", buildFullCopy())} className="bd-btn bd-btn-secondary">{copied === "full" ? "Copied" : "Copy pack"}</button>
             </div>
@@ -180,8 +180,8 @@ export default function Page() {
           <section className="bd-panel bd-card">
             <div className="bd-panel-head bd-panel-head-row">
               <div>
-                <div className="bd-panel-title">Working output</div>
-                <div className="bd-panel-sub">Clear position, next moves, and draft-ready material from messy inbound.</div>
+                <div className="bd-panel-title">Working position</div>
+                <div className="bd-panel-sub">Sharper for quotes, disputes, commercial replies, and internal handover.</div>
               </div>
               {result && <div className="bd-mode-row">{(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => <button key={item} onClick={() => setMode(item)} className={mode === item ? "bd-mode is-active" : "bd-mode"}>{modeLabels[item]}</button>)}</div>}
             </div>
@@ -208,8 +208,8 @@ export default function Page() {
 
                 <div className="bd-section-label">Facts and gaps</div>
                 <div className="bd-two-col">
-                  <SectionCard title="Requirements / issues found"><BulletList items={result.requirements} empty="No clear requirements found." /></SectionCard>
-                  <SectionCard title="Missing info / evidence gaps"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></SectionCard>
+                  <SectionCard title="Facts extracted"><BulletList items={result.requirements} empty="No clear requirements found." /></SectionCard>
+                  <SectionCard title="Evidence gaps"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></SectionCard>
                   <SectionCard title="Risks / blockers"><BulletList items={result.risks} empty="No major blockers found." /></SectionCard>
                   <SectionCard title="Assumptions inferred"><BulletList items={result.assumptions} empty="No major assumptions found." /></SectionCard>
                 </div>
@@ -219,11 +219,11 @@ export default function Page() {
                   <SectionCard title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></SectionCard>
                   <SectionCard title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></SectionCard>
                   <SectionCard title="Money / pricing references"><BulletList items={result.money} empty="No money references found." /></SectionCard>
-                  <SectionCard title="Questions found in source material"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>
+                  <SectionCard title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>
                 </div>
 
                 <div className="bd-note-card">
-                  <div className="bd-note-title">Use and liability note</div>
+                  <div className="bd-note-title">Draft support only</div>
                   <p>BriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, or regulated professional advice. Review facts, figures, attachments, and final wording before sending or relying on it.</p>
                 </div>
               </div>
@@ -235,8 +235,8 @@ export default function Page() {
   );
 }
 
-function SampleCard({ title, text, onClick }: { title: string; text: string; onClick: () => void }) {
-  return <button className="bd-lane-card" onClick={onClick}><span className="bd-lane-title">{title}</span><span className="bd-lane-text">{text}</span></button>;
+function LaneCard({ title, text, onClick, active = false }: { title: string; text: string; onClick: () => void; active?: boolean }) {
+  return <button className={active ? "bd-lane-card is-active" : "bd-lane-card"} onClick={onClick}><span className="bd-lane-title">{title}</span><span className="bd-lane-text">{text}</span></button>;
 }
 
 function DecisionCard({ label, value }: { label: string; value: string }) {
