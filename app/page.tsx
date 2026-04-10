@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 type DecisionLevel = "low" | "medium" | "high";
 type QuoteReadiness = "ready for rough estimate" | "follow-up needed" | "inspection needed" | "not enough information";
 type BudgetSignal = "present" | "missing";
+type LaneKey = "site" | "services" | "disputes" | "support";
 
 type BriefDropResult = {
   brief: string;
@@ -28,14 +29,23 @@ type BriefDropResult = {
 
 type OutputMode = "brief" | "reply" | "internal" | "quote" | "discovery";
 
-const samples = {
+const samples: Record<LaneKey, string> = {
   site:
     "Need help pricing a rental flat turnaround. It’s a 2-bed first floor flat, roughly 58 to 62 square metres total. We’ve got a messy outgoing inspection list. Bedroom 1 needs a wall repaired where shelving was ripped out. Lounge has bad stains on the ceiling from an old leak that has apparently been fixed but needs checking. Kitchen worktop edge has swollen near the sink. Bathroom sealant is black and there’s movement in one floor tile by the WC. Budget around £1,800 all in, maybe stretch to £2,400 if needed. Access from Monday, tenant due in 12 days. Break down what is urgent, what is cosmetic, and whether this sounds like one trade or several.",
   services:
     "Need a quote for a landing page rewrite and email sequence for a new service launch. We need better positioning, 5 emails, and a tighter offer page. Budget is around £1,500 to £2,500. We have rough notes but no proper brief yet. Review this week and tell us what is missing before a proper proposal.",
   disputes:
     "Need help replying to a payment dispute. We have a chain of WhatsApp messages, two invoices, and a customer saying some extras were not agreed even though the work was requested in messages. I need a clear chronology, key facts extracted, issues list, and two draft responses: one open commercial response and one without prejudice settlement-style draft. I do not want anything overstated. I want missing evidence flagged, weak points flagged, and wording that stays firm without creating liability.",
+  support:
+    "Need help with a council support form and housing issue. The letter is full of terms we do not understand. We need a plain-English summary, key terms explained, possible rights or duties to check, an evidence checklist, and safer draft wording for the form and follow-up letter. There are heating cost problems, possible council tax support questions, and a housing repair issue. We do not want anything overstated and need deadlines flagged.",
 };
+
+const laneCards: Array<{ key: LaneKey; title: string; text: string }> = [
+  { key: "site", title: "Site & scope", text: "Quotes, access, measurements, materials, snagging, exclusions." },
+  { key: "services", title: "Services & fees", text: "Deliverables, revisions, client inputs, fee framing, scope drift." },
+  { key: "disputes", title: "Disputes & position", text: "Chronology, payment issues, evidence gaps, response drafts." },
+  { key: "support", title: "Council, housing & support", text: "Forms, terminology help, support statements, rights/process checks, evidence packs." },
+];
 
 const modeLabels: Record<OutputMode, string> = {
   brief: "Position",
@@ -50,6 +60,7 @@ function titleCase(value: string) {
 }
 
 export default function Page() {
+  const [lane, setLane] = useState<LaneKey>("services");
   const [input, setInput] = useState(samples.services);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BriefDropResult | null>(null);
@@ -58,6 +69,14 @@ export default function Page() {
   const [copied, setCopied] = useState("");
   const [mode, setMode] = useState<OutputMode>("brief");
   const [showOriginal, setShowOriginal] = useState(false);
+
+  function chooseLane(nextLane: LaneKey) {
+    setLane(nextLane);
+    setInput(samples[nextLane]);
+    setResult(null);
+    setError("");
+    setStatus("");
+  }
 
   async function handleBuild() {
     setLoading(true);
@@ -106,8 +125,8 @@ export default function Page() {
     return [
       `Decision strip:\nQuote readiness: ${result.quoteReadiness}\nBudget signal: ${result.budgetSignal}\nUrgency: ${result.urgency}\nScope clarity: ${result.scopeClarity}`,
       `\nPosition:\n${result.brief}`,
-      `\nRequirements / issues:\n- ${result.requirements.join("\n- ") || "None"}`,
-      `\nMissing info / evidence gaps:\n- ${result.missingInfo.join("\n- ") || "None"}`,
+      `\nFacts extracted:\n- ${result.requirements.join("\n- ") || "None"}`,
+      `\nEvidence gaps:\n- ${result.missingInfo.join("\n- ") || "None"}`,
       `\nNext steps:\n- ${result.nextSteps.join("\n- ") || "None"}`,
       `\nMoney / pricing:\n- ${result.money.join("\n- ") || "None"}`,
       `\nQuestions found:\n- ${result.questionsFound.join("\n- ") || "None"}`,
@@ -117,7 +136,7 @@ export default function Page() {
       `\nInternal brief:\n${result.internalBrief}`,
       `\nCommercial draft:\n${result.quotePrep}`,
       `\nEvidence / dispute draft:\n${result.discoveryPrep}`,
-      `\nNote:\nBriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, or regulated professional advice. Review facts, figures, attachments, and final wording before sending or relying on it.`,
+      `\nNote:\nBriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, regulated welfare, or legal advice. Review facts, figures, attachments, deadlines, and final wording before sending or relying on it.`,
     ].join("\n");
   }
 
@@ -143,13 +162,13 @@ export default function Page() {
 
           <div className="bd-hero-copy">
             <h1>Turn messy inbound into a clear position.</h1>
-            <p>Built for scope, fees, disputes, and internal handover. Facts up front. Gaps visible. Next move clear.</p>
+            <p>Built for scope, fees, disputes, and public-support paperwork. Facts up front. Gaps visible. Next move clear.</p>
           </div>
 
           <div className="bd-lane-grid">
-            <LaneCard title="Site & scope" text="Quotes, access, measurements, materials, snagging, exclusions." onClick={() => setInput(samples.site)} active />
-            <LaneCard title="Services & fees" text="Deliverables, revisions, client inputs, fee framing, scope drift." onClick={() => setInput(samples.services)} />
-            <LaneCard title="Disputes & position" text="Chronology, payment issues, evidence gaps, response drafts." onClick={() => setInput(samples.disputes)} />
+            {laneCards.map((card) => (
+              <LaneCard key={card.key} title={card.title} text={card.text} onClick={() => chooseLane(card.key)} active={lane === card.key} />
+            ))}
           </div>
         </section>
 
@@ -157,7 +176,7 @@ export default function Page() {
           <section className="bd-panel bd-card">
             <div className="bd-panel-head">
               <div className="bd-panel-title">Source material</div>
-              <div className="bd-panel-sub">Paste messages, emails, notes, complaint chains, quote requests, or internal handover text.</div>
+              <div className="bd-panel-sub">Paste messages, emails, notes, complaint chains, official letters, form wording, quote requests, or internal handover text.</div>
             </div>
 
             <textarea value={input} onChange={(e) => setInput(e.target.value)} className="bd-textarea" placeholder="Paste the source material here..." />
@@ -181,9 +200,15 @@ export default function Page() {
             <div className="bd-panel-head bd-panel-head-row">
               <div>
                 <div className="bd-panel-title">Working position</div>
-                <div className="bd-panel-sub">Sharper for quotes, disputes, commercial replies, and internal handover.</div>
+                <div className="bd-panel-sub">Sharper for quotes, disputes, commercial replies, council/housing/support paperwork, and internal handover.</div>
               </div>
-              {result && <div className="bd-mode-row">{(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => <button key={item} onClick={() => setMode(item)} className={mode === item ? "bd-mode is-active" : "bd-mode"}>{modeLabels[item]}</button>)}</div>}
+              {result && (
+                <div className="bd-mode-row">
+                  {(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => (
+                    <button key={item} onClick={() => setMode(item)} className={mode === item ? "bd-mode is-active" : "bd-mode"}>{modeLabels[item]}</button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {!result && !error ? (
@@ -224,7 +249,7 @@ export default function Page() {
 
                 <div className="bd-note-card">
                   <div className="bd-note-title">Draft support only</div>
-                  <p>BriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, or regulated professional advice. Review facts, figures, attachments, and final wording before sending or relying on it.</p>
+                  <p>BriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, regulated welfare, or regulated legal advice. Review facts, figures, attachments, deadlines, and final wording before sending or relying on it.</p>
                 </div>
               </div>
             ) : null}
