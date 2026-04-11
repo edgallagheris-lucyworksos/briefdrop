@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 type DecisionLevel = "low" | "medium" | "high";
 type QuoteReadiness = "ready for rough estimate" | "follow-up needed" | "inspection needed" | "not enough information";
@@ -29,6 +29,16 @@ type BriefDropResult = {
 
 type OutputMode = "brief" | "reply" | "internal" | "quote" | "discovery";
 
+type LaneMeta = {
+  title: string;
+  text: string;
+  status: string;
+  focus: string;
+  inputTitle: string;
+  inputSub: string;
+  outputSub: string;
+};
+
 const samples: Record<LaneKey, string> = {
   site:
     "Need help pricing a rental flat turnaround. It’s a 2-bed first floor flat, roughly 58 to 62 square metres total. We’ve got a messy outgoing inspection list. Bedroom 1 needs a wall repaired where shelving was ripped out. Lounge has bad stains on the ceiling from an old leak that has apparently been fixed but needs checking. Kitchen worktop edge has swollen near the sink. Bathroom sealant is black and there’s movement in one floor tile by the WC. Budget around £1,800 all in, maybe stretch to £2,400 if needed. Access from Monday, tenant due in 12 days. Break down what is urgent, what is cosmetic, and whether this sounds like one trade or several.",
@@ -40,12 +50,44 @@ const samples: Record<LaneKey, string> = {
     "Need help with a council support form and housing issue. The letter is full of terms we do not understand. We need a plain-English summary, key terms explained, possible rights or duties to check, an evidence checklist, and safer draft wording for the form and follow-up letter. There are heating cost problems, possible council tax support questions, and a housing repair issue. We do not want anything overstated and need deadlines flagged.",
 };
 
-const laneCards: Array<{ key: LaneKey; title: string; text: string }> = [
-  { key: "site", title: "Site & scope", text: "Quotes, access, measurements, materials, snagging, exclusions." },
-  { key: "services", title: "Services & fees", text: "Deliverables, revisions, client inputs, fee framing, scope drift." },
-  { key: "disputes", title: "Disputes & position", text: "Chronology, payment issues, evidence gaps, response drafts." },
-  { key: "support", title: "Council, housing & support", text: "Forms, terminology help, support statements, rights/process checks, evidence packs." },
-];
+const laneMeta: Record<LaneKey, LaneMeta> = {
+  site: {
+    title: "Site & scope",
+    text: "Quotes, access, measurements, materials, snagging, exclusions.",
+    status: "Current lane: Site & scope",
+    focus: "Output focus: scope, exclusions, pricing flags, access, urgency.",
+    inputTitle: "Source material · Site & scope",
+    inputSub: "Paste snagging lists, quote requests, inspection notes, access details, repair issues, or messy scope notes.",
+    outputSub: "Sharper for repairs, access, materials, exclusions, rough estimates, and scope clarity.",
+  },
+  services: {
+    title: "Services & fees",
+    text: "Deliverables, revisions, client inputs, fee framing, scope drift.",
+    status: "Current lane: Services & fees",
+    focus: "Output focus: deliverables, fee framing, missing inputs, commercial wording.",
+    inputTitle: "Source material · Services & fees",
+    inputSub: "Paste enquiry text, discovery notes, proposal drafts, timelines, revision issues, or pricing questions.",
+    outputSub: "Sharper for proposals, deliverables, fees, revisions, and client-side dependencies.",
+  },
+  disputes: {
+    title: "Disputes & position",
+    text: "Chronology, payment issues, evidence gaps, response drafts.",
+    status: "Current lane: Disputes & position",
+    focus: "Output focus: chronology, evidence gaps, risk wording, reply drafts.",
+    inputTitle: "Source material · Disputes & position",
+    inputSub: "Paste complaint chains, invoices, message trails, meeting notes, withheld-payment issues, or draft replies.",
+    outputSub: "Sharper for disputes, commercial replies, chronology, evidence gaps, and safer wording.",
+  },
+  support: {
+    title: "Council, housing & support",
+    text: "Forms, terminology help, support statements, rights/process checks, evidence packs.",
+    status: "Current lane: Council, housing & support",
+    focus: "Output focus: plain-English wording, missing evidence, process checks, next steps.",
+    inputTitle: "Source material · Council, housing & support",
+    inputSub: "Paste letters, forms, housing issues, support statements, benefit wording, heating support questions, or council responses.",
+    outputSub: "Sharper for council forms, housing issues, support statements, terminology help, and evidence-led next steps.",
+  },
+};
 
 const modeLabels: Record<OutputMode, string> = {
   brief: "Position",
@@ -69,6 +111,7 @@ export default function Page() {
   const [copied, setCopied] = useState("");
   const [mode, setMode] = useState<OutputMode>("brief");
   const [showOriginal, setShowOriginal] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   function chooseLane(nextLane: LaneKey) {
     setLane(nextLane);
@@ -76,6 +119,10 @@ export default function Page() {
     setResult(null);
     setError("");
     setStatus("");
+    setMode(nextLane === "disputes" ? "reply" : nextLane === "support" ? "discovery" : "brief");
+    window.setTimeout(() => {
+      workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
   }
 
   async function handleBuild() {
@@ -140,6 +187,8 @@ export default function Page() {
     ].join("\n");
   }
 
+  const laneInfo = laneMeta[lane];
+
   return (
     <main className="bd-page">
       <div className="bd-shell">
@@ -165,18 +214,32 @@ export default function Page() {
             <p>Built for scope, fees, disputes, and public-support paperwork. Facts up front. Gaps visible. Next move clear.</p>
           </div>
 
-          <div className="bd-lane-grid">
-            {laneCards.map((card) => (
-              <LaneCard key={card.key} title={card.title} text={card.text} onClick={() => chooseLane(card.key)} active={lane === card.key} />
+          <div className="bd-lane-grid" role="tablist" aria-label="BriefDrop lanes">
+            {Object.entries(laneMeta).map(([key, card]) => (
+              <LaneCard
+                key={key}
+                title={card.title}
+                text={card.text}
+                onClick={() => chooseLane(key as LaneKey)}
+                active={lane === key}
+              />
             ))}
           </div>
+        </section>
+
+        <section className="bd-lane-status bd-card" ref={workspaceRef}>
+          <div>
+            <div className="bd-lane-status-label">{laneInfo.status}</div>
+            <div className="bd-lane-status-text">{laneInfo.focus}</div>
+          </div>
+          <div className="bd-lane-status-badge">Active lane</div>
         </section>
 
         <div className="bd-grid">
           <section className="bd-panel bd-card">
             <div className="bd-panel-head">
-              <div className="bd-panel-title">Source material</div>
-              <div className="bd-panel-sub">Paste messages, emails, notes, complaint chains, official letters, form wording, quote requests, or internal handover text.</div>
+              <div className="bd-panel-title">{laneInfo.inputTitle}</div>
+              <div className="bd-panel-sub">{laneInfo.inputSub}</div>
             </div>
 
             <textarea value={input} onChange={(e) => setInput(e.target.value)} className="bd-textarea" placeholder="Paste the source material here..." />
@@ -200,7 +263,7 @@ export default function Page() {
             <div className="bd-panel-head bd-panel-head-row">
               <div>
                 <div className="bd-panel-title">Working position</div>
-                <div className="bd-panel-sub">Sharper for quotes, disputes, commercial replies, council/housing/support paperwork, and internal handover.</div>
+                <div className="bd-panel-sub">{laneInfo.outputSub}</div>
               </div>
               {result && (
                 <div className="bd-mode-row">
