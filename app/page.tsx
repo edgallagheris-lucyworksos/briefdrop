@@ -6,6 +6,7 @@ type DecisionLevel = "low" | "medium" | "high";
 type QuoteReadiness = "ready for rough estimate" | "follow-up needed" | "inspection needed" | "not enough information";
 type BudgetSignal = "present" | "missing";
 type LaneKey = "site" | "services" | "disputes" | "support";
+type StepKey = "lane" | "situation" | "facts" | "gaps" | "draft" | "next";
 
 type BriefDropResult = {
   brief: string;
@@ -31,12 +32,14 @@ type OutputMode = "brief" | "reply" | "internal" | "quote" | "discovery";
 
 type LaneMeta = {
   title: string;
+  short: string;
   text: string;
   status: string;
   focus: string;
   inputTitle: string;
   inputSub: string;
   outputSub: string;
+  defaultMode: OutputMode;
 };
 
 const samples: Record<LaneKey, string> = {
@@ -53,39 +56,47 @@ const samples: Record<LaneKey, string> = {
 const laneMeta: Record<LaneKey, LaneMeta> = {
   site: {
     title: "Site & scope",
+    short: "Site",
     text: "Quotes, access, measurements, materials, snagging, exclusions.",
     status: "Current lane: Site & scope",
     focus: "Output focus: scope, exclusions, pricing flags, access, urgency.",
-    inputTitle: "Source material · Site & scope",
+    inputTitle: "Source · Site & scope",
     inputSub: "Paste snagging lists, quote requests, inspection notes, access details, repair issues, or messy scope notes.",
     outputSub: "Sharper for repairs, access, materials, exclusions, rough estimates, and scope clarity.",
+    defaultMode: "brief",
   },
   services: {
     title: "Services & fees",
+    short: "Services",
     text: "Deliverables, revisions, client inputs, fee framing, scope drift.",
     status: "Current lane: Services & fees",
     focus: "Output focus: deliverables, fee framing, missing inputs, commercial wording.",
-    inputTitle: "Source material · Services & fees",
+    inputTitle: "Source · Services & fees",
     inputSub: "Paste enquiry text, discovery notes, proposal drafts, timelines, revision issues, or pricing questions.",
     outputSub: "Sharper for proposals, deliverables, fees, revisions, and client-side dependencies.",
+    defaultMode: "quote",
   },
   disputes: {
     title: "Disputes & position",
+    short: "Disputes",
     text: "Chronology, payment issues, evidence gaps, response drafts.",
     status: "Current lane: Disputes & position",
     focus: "Output focus: chronology, evidence gaps, risk wording, reply drafts.",
-    inputTitle: "Source material · Disputes & position",
+    inputTitle: "Source · Disputes & position",
     inputSub: "Paste complaint chains, invoices, message trails, meeting notes, withheld-payment issues, or draft replies.",
     outputSub: "Sharper for disputes, commercial replies, chronology, evidence gaps, and safer wording.",
+    defaultMode: "reply",
   },
   support: {
     title: "Council, housing & support",
+    short: "Support",
     text: "Forms, terminology help, support statements, rights/process checks, evidence packs.",
     status: "Current lane: Council, housing & support",
     focus: "Output focus: plain-English wording, missing evidence, process checks, next steps.",
-    inputTitle: "Source material · Council, housing & support",
+    inputTitle: "Source · Council, housing & support",
     inputSub: "Paste letters, forms, housing issues, support statements, benefit wording, heating support questions, or council responses.",
     outputSub: "Sharper for council forms, housing issues, support statements, terminology help, and evidence-led next steps.",
+    defaultMode: "discovery",
   },
 };
 
@@ -97,8 +108,24 @@ const modeLabels: Record<OutputMode, string> = {
   discovery: "Evidence",
 };
 
+const stepLabels: Record<StepKey, string> = {
+  lane: "Lane",
+  situation: "Situation",
+  facts: "Facts",
+  gaps: "Gaps",
+  draft: "Draft",
+  next: "Next steps",
+};
+
 function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function inferStep(result: BriefDropResult | null, mode: OutputMode): StepKey {
+  if (!result) return "situation";
+  if (mode === "reply" || mode === "quote" || mode === "internal") return "draft";
+  if (mode === "discovery") return "gaps";
+  return "facts";
 }
 
 export default function Page() {
@@ -109,17 +136,20 @@ export default function Page() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [copied, setCopied] = useState("");
-  const [mode, setMode] = useState<OutputMode>("brief");
+  const [mode, setMode] = useState<OutputMode>(laneMeta.services.defaultMode);
   const [showOriginal, setShowOriginal] = useState(false);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const laneInfo = laneMeta[lane];
+  const currentStep = inferStep(result, mode);
 
   function chooseLane(nextLane: LaneKey) {
+    const meta = laneMeta[nextLane];
     setLane(nextLane);
     setInput(samples[nextLane]);
     setResult(null);
     setError("");
     setStatus("");
-    setMode(nextLane === "disputes" ? "reply" : nextLane === "support" ? "discovery" : "brief");
+    setMode(meta.defaultMode);
     window.setTimeout(() => {
       workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
@@ -140,7 +170,7 @@ export default function Page() {
       const data = JSON.parse(raw);
       if (!res.ok) throw new Error(data?.error || "Something went wrong");
       setResult(data);
-      setStatus(`Status ${res.status} · Output built`);
+      setStatus(`Status ${res.status} · Working pack built`);
     } catch (err: any) {
       setError(err.message || "Failed to build output");
     } finally {
@@ -187,13 +217,11 @@ export default function Page() {
     ].join("\n");
   }
 
-  const laneInfo = laneMeta[lane];
-
   return (
     <main className="bd-page">
       <div className="bd-shell">
         <section className="bd-hero bd-card">
-          <div className="bd-hero-top">
+          <div className="bd-topline">
             <div className="bd-brand">
               <div className="bd-mark" aria-hidden="true">
                 <span className="bd-mark-core" />
@@ -203,36 +231,49 @@ export default function Page() {
               </div>
               <div>
                 <div className="bd-name">BriefDrop</div>
-                <div className="bd-tag">Clarify scope. Draft response. Reduce risk.</div>
+                <div className="bd-tag">Strip the noise. Build the case.</div>
               </div>
             </div>
-            <div className="bd-badge">Control surface for messy inbound</div>
+            <div className="bd-badge">Working pack, not waffle</div>
           </div>
 
-          <div className="bd-hero-copy">
-            <h1>Turn messy inbound into a clear position.</h1>
-            <p>Built for scope, fees, disputes, and public-support paperwork. Facts up front. Gaps visible. Next move clear.</p>
+          <div className="bd-hero-row">
+            <div className="bd-hero-copy">
+              <h1>Sort the facts. Draft the move.</h1>
+              <p>Built for scope, fees, disputes, and public-support paperwork.</p>
+            </div>
+            <div className="bd-hero-note">
+              <div className="bd-hero-note-label">Use it for</div>
+              <div className="bd-hero-note-text">messy messages, complaints, quotes, official letters, evidence gaps, and reply drafts.</div>
+            </div>
           </div>
 
-          <div className="bd-lane-grid" role="tablist" aria-label="BriefDrop lanes">
+          <div className="bd-lane-strip" role="tablist" aria-label="BriefDrop lanes">
             {Object.entries(laneMeta).map(([key, card]) => (
-              <LaneCard
-                key={key}
-                title={card.title}
-                text={card.text}
-                onClick={() => chooseLane(key as LaneKey)}
-                active={lane === key}
-              />
+              <button key={key} className={lane === key ? "bd-lane-tab is-active" : "bd-lane-tab"} onClick={() => chooseLane(key as LaneKey)}>
+                {card.short}
+              </button>
             ))}
           </div>
         </section>
 
-        <section className="bd-lane-status bd-card" ref={workspaceRef}>
-          <div>
-            <div className="bd-lane-status-label">{laneInfo.status}</div>
-            <div className="bd-lane-status-text">{laneInfo.focus}</div>
-          </div>
-          <div className="bd-lane-status-badge">Active lane</div>
+        <section className="bd-status-wrap">
+          <section className="bd-lane-status bd-card" ref={workspaceRef}>
+            <div>
+              <div className="bd-lane-status-label">{laneInfo.status}</div>
+              <div className="bd-lane-status-text">{laneInfo.focus}</div>
+            </div>
+            <div className="bd-lane-status-badge">Active lane</div>
+          </section>
+
+          <section className="bd-steps bd-card">
+            {(["lane", "situation", "facts", "gaps", "draft", "next"] as StepKey[]).map((step) => (
+              <div key={step} className={step === currentStep ? "bd-step is-active" : step === "lane" ? "bd-step is-done" : "bd-step"}>
+                <span className="bd-step-dot" />
+                <span>{stepLabels[step]}</span>
+              </div>
+            ))}
+          </section>
         </section>
 
         <div className="bd-grid">
@@ -242,16 +283,24 @@ export default function Page() {
               <div className="bd-panel-sub">{laneInfo.inputSub}</div>
             </div>
 
+            <div className="bd-file-box">
+              <div>
+                <div className="bd-file-title">Files</div>
+                <div className="bd-file-sub">PDF / image / doc input is planned next. Current build uses pasted text only.</div>
+              </div>
+              <div className="bd-file-pill">text input live</div>
+            </div>
+
             <textarea value={input} onChange={(e) => setInput(e.target.value)} className="bd-textarea" placeholder="Paste the source material here..." />
 
             <div className="bd-actions">
-              <button onClick={handleBuild} disabled={loading} className="bd-btn bd-btn-primary">{loading ? "Building..." : "Build output"}</button>
-              <button onClick={() => { setInput(""); setResult(null); setError(""); setStatus(""); }} className="bd-btn bd-btn-secondary">Clear</button>
+              <button onClick={handleBuild} disabled={loading} className="bd-btn bd-btn-primary">{loading ? "Building..." : "Build working pack"}</button>
+              <button onClick={() => { setInput(""); setResult(null); setError(""); setStatus(""); }} className="bd-btn bd-btn-secondary">Reset matter</button>
               <button onClick={() => copyText("full", buildFullCopy())} className="bd-btn bd-btn-secondary">{copied === "full" ? "Copied" : "Copy pack"}</button>
             </div>
 
             <div className="bd-actions bd-actions-tight">
-              <button onClick={() => setShowOriginal((v) => !v)} className="bd-btn bd-btn-small">{showOriginal ? "Hide source material" : "Show source material"}</button>
+              <button onClick={() => setShowOriginal((v) => !v)} className="bd-btn bd-btn-small">{showOriginal ? "Hide source text" : "Show source text"}</button>
             </div>
 
             {showOriginal && <div className="bd-original">{input}</div>}
@@ -275,7 +324,7 @@ export default function Page() {
             </div>
 
             {!result && !error ? (
-              <div className="bd-empty">Hit <strong>Build output</strong> to turn the source material into a structured working pack.</div>
+              <div className="bd-empty">Pick a lane, paste the material, then hit <strong>Build working pack</strong>. BriefDrop will sort facts, gaps, draft wording, and next actions.</div>
             ) : result ? (
               <div className="bd-stack">
                 <div className="bd-summary-grid">
@@ -321,10 +370,6 @@ export default function Page() {
       </div>
     </main>
   );
-}
-
-function LaneCard({ title, text, onClick, active = false }: { title: string; text: string; onClick: () => void; active?: boolean }) {
-  return <button className={active ? "bd-lane-card is-active" : "bd-lane-card"} onClick={onClick}><span className="bd-lane-title">{title}</span><span className="bd-lane-text">{text}</span></button>;
 }
 
 function DecisionCard({ label, value }: { label: string; value: string }) {
