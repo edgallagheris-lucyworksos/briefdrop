@@ -6,7 +6,7 @@ type DecisionLevel = "low" | "medium" | "high";
 type QuoteReadiness = "ready for rough estimate" | "follow-up needed" | "inspection needed" | "not enough information";
 type BudgetSignal = "present" | "missing";
 type LaneKey = "site" | "services" | "disputes" | "support";
-type StepKey = "lane" | "situation" | "facts" | "gaps" | "draft" | "next";
+type StepKey = "lane" | "matter" | "facts" | "gaps" | "draft" | "next";
 
 type BriefDropResult = {
   brief: string;
@@ -40,6 +40,23 @@ type LaneMeta = {
   inputSub: string;
   outputSub: string;
   defaultMode: OutputMode;
+};
+
+type MatterState = {
+  matterTitle: string;
+  senderName: string;
+  senderRole: string;
+  senderOrg: string;
+  senderEmail: string;
+  senderPhone: string;
+  defaultSignoff: string;
+  recipientName: string;
+  recipientRole: string;
+  recipientOrg: string;
+  recipientRef: string;
+  matterStatus: string;
+  workDone: string;
+  verifiedMaterial: string;
 };
 
 const samples: Record<LaneKey, string> = {
@@ -110,11 +127,28 @@ const modeLabels: Record<OutputMode, string> = {
 
 const stepLabels: Record<StepKey, string> = {
   lane: "Lane",
-  situation: "Situation",
+  matter: "Matter",
   facts: "Facts",
   gaps: "Gaps",
   draft: "Draft",
   next: "Next steps",
+};
+
+const initialMatter: MatterState = {
+  matterTitle: "",
+  senderName: "",
+  senderRole: "",
+  senderOrg: "",
+  senderEmail: "",
+  senderPhone: "",
+  defaultSignoff: "Kind regards",
+  recipientName: "",
+  recipientRole: "",
+  recipientOrg: "",
+  recipientRef: "",
+  matterStatus: "Open",
+  workDone: "",
+  verifiedMaterial: "",
 };
 
 function titleCase(value: string) {
@@ -122,7 +156,7 @@ function titleCase(value: string) {
 }
 
 function inferStep(result: BriefDropResult | null, mode: OutputMode): StepKey {
-  if (!result) return "situation";
+  if (!result) return "matter";
   if (mode === "reply" || mode === "quote" || mode === "internal") return "draft";
   if (mode === "discovery") return "gaps";
   return "facts";
@@ -131,6 +165,7 @@ function inferStep(result: BriefDropResult | null, mode: OutputMode): StepKey {
 export default function Page() {
   const [lane, setLane] = useState<LaneKey>("services");
   const [input, setInput] = useState(samples.services);
+  const [matter, setMatter] = useState<MatterState>(initialMatter);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BriefDropResult | null>(null);
   const [error, setError] = useState("");
@@ -155,6 +190,10 @@ export default function Page() {
     }, 60);
   }
 
+  function updateMatter(key: keyof MatterState, value: string) {
+    setMatter((prev) => ({ ...prev, [key]: value }));
+  }
+
   async function handleBuild() {
     setLoading(true);
     setError("");
@@ -164,7 +203,11 @@ export default function Page() {
       const res = await fetch("/api/clean", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({
+          input,
+          lane,
+          matter,
+        }),
       });
       const raw = await res.text();
       const data = JSON.parse(raw);
@@ -197,10 +240,26 @@ export default function Page() {
     return result.brief;
   }, [mode, result]);
 
+  const signerBlock = useMemo(() => {
+    const parts = [matter.defaultSignoff, matter.senderName, matter.senderRole || matter.senderOrg, matter.senderEmail, matter.senderPhone].filter(Boolean);
+    return parts.join("\n");
+  }, [matter]);
+
   function buildFullCopy() {
-    if (!result) return input;
+    const header = [
+      `Matter title: ${matter.matterTitle || "Untitled matter"}`,
+      `Lane: ${laneInfo.title}`,
+      `Status: ${matter.matterStatus || "Open"}`,
+      matter.recipientName || matter.recipientOrg ? `Recipient: ${[matter.recipientName, matter.recipientRole, matter.recipientOrg].filter(Boolean).join(" · ")}` : "",
+      matter.recipientRef ? `Reference: ${matter.recipientRef}` : "",
+      matter.workDone ? `Work already done:\n${matter.workDone}` : "",
+      matter.verifiedMaterial ? `Verified material:\n${matter.verifiedMaterial}` : "",
+    ].filter(Boolean).join("\n");
+
+    if (!result) return `${header}\n\n${input}`;
     return [
-      `Decision strip:\nQuote readiness: ${result.quoteReadiness}\nBudget signal: ${result.budgetSignal}\nUrgency: ${result.urgency}\nScope clarity: ${result.scopeClarity}`,
+      header,
+      `\nDecision strip:\nQuote readiness: ${result.quoteReadiness}\nBudget signal: ${result.budgetSignal}\nUrgency: ${result.urgency}\nScope clarity: ${result.scopeClarity}`,
       `\nPosition:\n${result.brief}`,
       `\nFacts extracted:\n- ${result.requirements.join("\n- ") || "None"}`,
       `\nEvidence gaps:\n- ${result.missingInfo.join("\n- ") || "None"}`,
@@ -213,8 +272,9 @@ export default function Page() {
       `\nInternal brief:\n${result.internalBrief}`,
       `\nCommercial draft:\n${result.quotePrep}`,
       `\nEvidence / dispute draft:\n${result.discoveryPrep}`,
+      signerBlock ? `\nSuggested sign-off:\n${signerBlock}` : "",
       `\nNote:\nBriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, regulated welfare, or legal advice. Review facts, figures, attachments, deadlines, and final wording before sending or relying on it.`,
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }
 
   return (
@@ -267,7 +327,7 @@ export default function Page() {
           </section>
 
           <section className="bd-steps bd-card">
-            {(["lane", "situation", "facts", "gaps", "draft", "next"] as StepKey[]).map((step) => (
+            {(["lane", "matter", "facts", "gaps", "draft", "next"] as StepKey[]).map((step) => (
               <div key={step} className={step === currentStep ? "bd-step is-active" : step === "lane" ? "bd-step is-done" : "bd-step"}>
                 <span className="bd-step-dot" />
                 <span>{stepLabels[step]}</span>
@@ -279,6 +339,42 @@ export default function Page() {
         <div className="bd-grid">
           <section className="bd-panel bd-card">
             <div className="bd-panel-head">
+              <div className="bd-panel-title">Matter setup</div>
+              <div className="bd-panel-sub">Set the parties, matter title, sign-off, previous work done, and verified material before drafting.</div>
+            </div>
+
+            <div className="bd-form-grid bd-form-grid-top">
+              <Field label="Matter title"><input value={matter.matterTitle} onChange={(e) => updateMatter("matterTitle", e.target.value)} className="bd-input" placeholder="Payment dispute – Ash Road extras" /></Field>
+              <Field label="Status"><input value={matter.matterStatus} onChange={(e) => updateMatter("matterStatus", e.target.value)} className="bd-input" placeholder="Open / Awaiting reply / Ready to send" /></Field>
+            </div>
+
+            <div className="bd-section-label">Sender / sign-off</div>
+            <div className="bd-form-grid">
+              <Field label="Sender name"><input value={matter.senderName} onChange={(e) => updateMatter("senderName", e.target.value)} className="bd-input" placeholder="Edward Gallagher" /></Field>
+              <Field label="Role"><input value={matter.senderRole} onChange={(e) => updateMatter("senderRole", e.target.value)} className="bd-input" placeholder="Director / Sole trader / Project lead" /></Field>
+              <Field label="Organisation"><input value={matter.senderOrg} onChange={(e) => updateMatter("senderOrg", e.target.value)} className="bd-input" placeholder="Omnibuild / BriefDrop" /></Field>
+              <Field label="Default sign-off"><input value={matter.defaultSignoff} onChange={(e) => updateMatter("defaultSignoff", e.target.value)} className="bd-input" placeholder="Kind regards" /></Field>
+              <Field label="Email"><input value={matter.senderEmail} onChange={(e) => updateMatter("senderEmail", e.target.value)} className="bd-input" placeholder="name@example.com" /></Field>
+              <Field label="Phone"><input value={matter.senderPhone} onChange={(e) => updateMatter("senderPhone", e.target.value)} className="bd-input" placeholder="07..." /></Field>
+            </div>
+
+            <div className="bd-section-label">Recipient / other party</div>
+            <div className="bd-form-grid">
+              <Field label="Recipient name"><input value={matter.recipientName} onChange={(e) => updateMatter("recipientName", e.target.value)} className="bd-input" placeholder="Derek Lloyd" /></Field>
+              <Field label="Recipient role"><input value={matter.recipientRole} onChange={(e) => updateMatter("recipientRole", e.target.value)} className="bd-input" placeholder="Client / Housing officer / Manager" /></Field>
+              <Field label="Organisation"><input value={matter.recipientOrg} onChange={(e) => updateMatter("recipientOrg", e.target.value)} className="bd-input" placeholder="Sustainable Kitchens / Bristol City Council" /></Field>
+              <Field label="Reference"><input value={matter.recipientRef} onChange={(e) => updateMatter("recipientRef", e.target.value)} className="bd-input" placeholder="Case ref / invoice ref / complaint ref" /></Field>
+            </div>
+
+            <div className="bd-section-label">Previous material</div>
+            <div className="bd-form-stack">
+              <Field label="Work already done"><textarea value={matter.workDone} onChange={(e) => updateMatter("workDone", e.target.value)} className="bd-textarea bd-textarea-small" placeholder="What has already happened, what has already been sent, what work is complete, what money has already changed hands..." /></Field>
+              <Field label="Verified / safe material to reuse"><textarea value={matter.verifiedMaterial} onChange={(e) => updateMatter("verifiedMaterial", e.target.value)} className="bd-textarea bd-textarea-small" placeholder="Facts already checked, evidence already verified, timeline points safe to reuse, previous agreed wording..." /></Field>
+            </div>
+          </section>
+
+          <section className="bd-panel bd-card">
+            <div className="bd-panel-head">
               <div className="bd-panel-title">{laneInfo.inputTitle}</div>
               <div className="bd-panel-sub">{laneInfo.inputSub}</div>
             </div>
@@ -286,9 +382,9 @@ export default function Page() {
             <div className="bd-file-box">
               <div>
                 <div className="bd-file-title">Files</div>
-                <div className="bd-file-sub">PDF / image / doc input is planned next. Current build uses pasted text only.</div>
+                <div className="bd-file-sub">PDF / image / doc input is planned next. Current build uses pasted text plus matter setup.</div>
               </div>
-              <div className="bd-file-pill">text input live</div>
+              <div className="bd-file-pill">matter setup live</div>
             </div>
 
             <textarea value={input} onChange={(e) => setInput(e.target.value)} className="bd-textarea" placeholder="Paste the source material here..." />
@@ -307,69 +403,86 @@ export default function Page() {
             {status && !error && <div className="bd-status">{status}</div>}
             {error && <div className="bd-error">{error}</div>}
           </section>
-
-          <section className="bd-panel bd-card">
-            <div className="bd-panel-head bd-panel-head-row">
-              <div>
-                <div className="bd-panel-title">Working position</div>
-                <div className="bd-panel-sub">{laneInfo.outputSub}</div>
-              </div>
-              {result && (
-                <div className="bd-mode-row">
-                  {(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => (
-                    <button key={item} onClick={() => setMode(item)} className={mode === item ? "bd-mode is-active" : "bd-mode"}>{modeLabels[item]}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {!result && !error ? (
-              <div className="bd-empty">Pick a lane, paste the material, then hit <strong>Build working pack</strong>. BriefDrop will sort facts, gaps, draft wording, and next actions.</div>
-            ) : result ? (
-              <div className="bd-stack">
-                <div className="bd-summary-grid">
-                  <DecisionCard label="Quote readiness" value={titleCase(result.quoteReadiness)} />
-                  <DecisionCard label="Budget signal" value={titleCase(result.budgetSignal)} />
-                  <DecisionCard label="Urgency" value={titleCase(result.urgency)} />
-                  <DecisionCard label="Scope clarity" value={titleCase(result.scopeClarity)} />
-                </div>
-
-                <SectionCard title={modeLabels[mode]} emphasis>
-                  <p className="bd-copy">{activeOutput}</p>
-                  <div className="bd-actions bd-actions-tight">
-                    <button onClick={() => copyText(mode, activeOutput)} className="bd-btn bd-btn-small">{copied === mode ? "Copied" : `Copy ${modeLabels[mode]}`}</button>
-                    <button onClick={() => copyText("reply", result.clientReply)} className="bd-btn bd-btn-small">{copied === "reply" ? "Copied" : "Copy reply"}</button>
-                    <button onClick={() => copyText("internal", result.internalBrief)} className="bd-btn bd-btn-small">{copied === "internal" ? "Copied" : "Copy internal"}</button>
-                  </div>
-                </SectionCard>
-
-                <div className="bd-section-label">Facts and gaps</div>
-                <div className="bd-two-col">
-                  <SectionCard title="Facts extracted"><BulletList items={result.requirements} empty="No clear requirements found." /></SectionCard>
-                  <SectionCard title="Evidence gaps"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></SectionCard>
-                  <SectionCard title="Risks / blockers"><BulletList items={result.risks} empty="No major blockers found." /></SectionCard>
-                  <SectionCard title="Assumptions inferred"><BulletList items={result.assumptions} empty="No major assumptions found." /></SectionCard>
-                </div>
-
-                <div className="bd-section-label">Next move</div>
-                <div className="bd-two-col">
-                  <SectionCard title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></SectionCard>
-                  <SectionCard title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></SectionCard>
-                  <SectionCard title="Money / pricing references"><BulletList items={result.money} empty="No money references found." /></SectionCard>
-                  <SectionCard title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>
-                </div>
-
-                <div className="bd-note-card">
-                  <div className="bd-note-title">Draft support only</div>
-                  <p>BriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, regulated welfare, or regulated legal advice. Review facts, figures, attachments, deadlines, and final wording before sending or relying on it.</p>
-                </div>
-              </div>
-            ) : null}
-          </section>
         </div>
+
+        <section className="bd-panel bd-card bd-output-panel">
+          <div className="bd-panel-head bd-panel-head-row">
+            <div>
+              <div className="bd-panel-title">Working position</div>
+              <div className="bd-panel-sub">{laneInfo.outputSub}</div>
+            </div>
+            {result && (
+              <div className="bd-mode-row">
+                {(["brief", "reply", "internal", "quote", "discovery"] as OutputMode[]).map((item) => (
+                  <button key={item} onClick={() => setMode(item)} className={mode === item ? "bd-mode is-active" : "bd-mode"}>{modeLabels[item]}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {!result && !error ? (
+            <div className="bd-empty">Pick a lane, set the matter header, paste the source material, then hit <strong>Build working pack</strong>. BriefDrop will sort facts, gaps, draft wording, and next actions.</div>
+          ) : result ? (
+            <div className="bd-stack">
+              <div className="bd-summary-grid">
+                <DecisionCard label="Quote readiness" value={titleCase(result.quoteReadiness)} />
+                <DecisionCard label="Budget signal" value={titleCase(result.budgetSignal)} />
+                <DecisionCard label="Urgency" value={titleCase(result.urgency)} />
+                <DecisionCard label="Scope clarity" value={titleCase(result.scopeClarity)} />
+              </div>
+
+              <SectionCard title={modeLabels[mode]} emphasis>
+                <p className="bd-copy">{activeOutput}</p>
+                <div className="bd-actions bd-actions-tight">
+                  <button onClick={() => copyText(mode, activeOutput)} className="bd-btn bd-btn-small">{copied === mode ? "Copied" : `Copy ${modeLabels[mode]}`}</button>
+                  <button onClick={() => copyText("reply", result.clientReply)} className="bd-btn bd-btn-small">{copied === "reply" ? "Copied" : "Copy reply"}</button>
+                  <button onClick={() => copyText("internal", result.internalBrief)} className="bd-btn bd-btn-small">{copied === "internal" ? "Copied" : "Copy internal"}</button>
+                </div>
+              </SectionCard>
+
+              <div className="bd-three-col">
+                <SectionCard title="Matter header">
+                  <BulletList items={[
+                    matter.matterTitle || "No matter title set",
+                    matter.matterStatus ? `Status: ${matter.matterStatus}` : "No status set",
+                    [matter.recipientName, matter.recipientRole, matter.recipientOrg].filter(Boolean).join(" · ") || "No recipient set",
+                    matter.recipientRef ? `Reference: ${matter.recipientRef}` : "No reference set",
+                  ]} empty="No matter header yet." />
+                </SectionCard>
+                <SectionCard title="Work already done"><ParagraphOrEmpty text={matter.workDone} empty="No previous work logged yet." /></SectionCard>
+                <SectionCard title="Verified material"><ParagraphOrEmpty text={matter.verifiedMaterial} empty="No verified material logged yet." /></SectionCard>
+              </div>
+
+              <div className="bd-section-label">Facts and gaps</div>
+              <div className="bd-two-col">
+                <SectionCard title="Facts extracted"><BulletList items={result.requirements} empty="No clear requirements found." /></SectionCard>
+                <SectionCard title="Evidence gaps"><BulletList items={result.missingInfo} empty="No obvious missing information found." /></SectionCard>
+                <SectionCard title="Risks / blockers"><BulletList items={result.risks} empty="No major blockers found." /></SectionCard>
+                <SectionCard title="Assumptions inferred"><BulletList items={result.assumptions} empty="No major assumptions found." /></SectionCard>
+              </div>
+
+              <div className="bd-section-label">Next move</div>
+              <div className="bd-two-col">
+                <SectionCard title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></SectionCard>
+                <SectionCard title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></SectionCard>
+                <SectionCard title="Money / pricing references"><BulletList items={result.money} empty="No money references found." /></SectionCard>
+                <SectionCard title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>
+              </div>
+
+              <div className="bd-two-col">
+                <SectionCard title="Suggested sign-off"><ParagraphOrEmpty text={signerBlock} empty="No sender/sign-off block set yet." preserve /></SectionCard>
+                <SectionCard title="Draft support only"><p className="bd-copy">BriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, regulated welfare, or regulated legal advice. Review facts, figures, attachments, deadlines, and final wording before sending or relying on it.</p></SectionCard>
+              </div>
+            </div>
+          ) : null}
+        </section>
       </div>
     </main>
   );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="bd-field"><span className="bd-field-label">{label}</span>{children}</label>;
 }
 
 function DecisionCard({ label, value }: { label: string; value: string }) {
@@ -381,6 +494,12 @@ function SectionCard({ title, children, emphasis = false }: { title: string; chi
 }
 
 function BulletList({ items, empty }: { items: string[]; empty: string }) {
-  if (!items || items.length === 0) return <div className="bd-muted">{empty}</div>;
-  return <ul className="bd-list">{items.map((item, index) => <li key={`${item}-${index}`} className="bd-list-item">{item}</li>)}</ul>;
+  const cleaned = items.filter((item) => item && item.trim());
+  if (cleaned.length === 0) return <div className="bd-muted">{empty}</div>;
+  return <ul className="bd-list">{cleaned.map((item, index) => <li key={`${item}-${index}`} className="bd-list-item">{item}</li>)}</ul>;
+}
+
+function ParagraphOrEmpty({ text, empty, preserve = false }: { text: string; empty: string; preserve?: boolean }) {
+  if (!text.trim()) return <div className="bd-muted">{empty}</div>;
+  return <p className={preserve ? "bd-copy bd-copy-preserve" : "bd-copy"}>{text}</p>;
 }
