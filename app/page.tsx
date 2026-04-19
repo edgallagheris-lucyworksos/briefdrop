@@ -3,7 +3,11 @@
 import { useMemo, useRef, useState } from "react";
 
 type DecisionLevel = "low" | "medium" | "high";
-type QuoteReadiness = "ready for rough estimate" | "follow-up needed" | "inspection needed" | "not enough information";
+type QuoteReadiness =
+  | "ready for rough estimate"
+  | "follow-up needed"
+  | "inspection needed"
+  | "not enough information";
 type BudgetSignal = "present" | "missing";
 type LaneKey = "site" | "services" | "disputes" | "support";
 type StepKey = "lane" | "matter" | "facts" | "gaps" | "draft" | "next";
@@ -17,6 +21,12 @@ type BriefDropResult = {
   questionsFound: string[];
   risks: string[];
   assumptions: string[];
+  chronology: string[];
+  termsExplained: string[];
+  rightsChecks: string[];
+  dutiesChecks: string[];
+  evidenceChecklist: string[];
+  deadlineFlags: string[];
   clientReply: string;
   followUpQuestions: string[];
   internalBrief: string;
@@ -203,11 +213,7 @@ export default function Page() {
       const res = await fetch("/api/clean", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input,
-          lane,
-          matter,
-        }),
+        body: JSON.stringify({ input, lane, matter }),
       });
       const raw = await res.text();
       const data = JSON.parse(raw);
@@ -241,7 +247,13 @@ export default function Page() {
   }, [mode, result]);
 
   const signerBlock = useMemo(() => {
-    const parts = [matter.defaultSignoff, matter.senderName, matter.senderRole || matter.senderOrg, matter.senderEmail, matter.senderPhone].filter(Boolean);
+    const parts = [
+      matter.defaultSignoff,
+      matter.senderName,
+      matter.senderRole || matter.senderOrg,
+      matter.senderEmail,
+      matter.senderPhone,
+    ].filter(Boolean);
     return parts.join("\n");
   }, [matter]);
 
@@ -250,19 +262,28 @@ export default function Page() {
       `Matter title: ${matter.matterTitle || "Untitled matter"}`,
       `Lane: ${laneInfo.title}`,
       `Status: ${matter.matterStatus || "Open"}`,
-      matter.recipientName || matter.recipientOrg ? `Recipient: ${[matter.recipientName, matter.recipientRole, matter.recipientOrg].filter(Boolean).join(" · ")}` : "",
+      matter.recipientName || matter.recipientOrg
+        ? `Recipient: ${[matter.recipientName, matter.recipientRole, matter.recipientOrg].filter(Boolean).join(" · ")}`
+        : "",
       matter.recipientRef ? `Reference: ${matter.recipientRef}` : "",
       matter.workDone ? `Work already done:\n${matter.workDone}` : "",
       matter.verifiedMaterial ? `Verified material:\n${matter.verifiedMaterial}` : "",
     ].filter(Boolean).join("\n");
 
     if (!result) return `${header}\n\n${input}`;
+
     return [
       header,
       `\nDecision strip:\nQuote readiness: ${result.quoteReadiness}\nBudget signal: ${result.budgetSignal}\nUrgency: ${result.urgency}\nScope clarity: ${result.scopeClarity}`,
       `\nPosition:\n${result.brief}`,
+      `\nChronology:\n- ${result.chronology.join("\n- ") || "None"}`,
       `\nFacts extracted:\n- ${result.requirements.join("\n- ") || "None"}`,
+      `\nEvidence checklist:\n- ${result.evidenceChecklist.join("\n- ") || "None"}`,
       `\nEvidence gaps:\n- ${result.missingInfo.join("\n- ") || "None"}`,
+      `\nDeadline flags:\n- ${result.deadlineFlags.join("\n- ") || "None"}`,
+      `\nTerms explained:\n- ${result.termsExplained.join("\n- ") || "None"}`,
+      `\nRights checks:\n- ${result.rightsChecks.join("\n- ") || "None"}`,
+      `\nDuties checks:\n- ${result.dutiesChecks.join("\n- ") || "None"}`,
       `\nNext steps:\n- ${result.nextSteps.join("\n- ") || "None"}`,
       `\nMoney / pricing:\n- ${result.money.join("\n- ") || "None"}`,
       `\nQuestions found:\n- ${result.questionsFound.join("\n- ") || "None"}`,
@@ -273,7 +294,6 @@ export default function Page() {
       `\nCommercial draft:\n${result.quotePrep}`,
       `\nEvidence / dispute draft:\n${result.discoveryPrep}`,
       signerBlock ? `\nSuggested sign-off:\n${signerBlock}` : "",
-      `\nNote:\nBriefDrop structures information and drafts working outputs. It does not provide legal, tax, accounting, regulated welfare, or legal advice. Review facts, figures, attachments, deadlines, and final wording before sending or relying on it.`,
     ].filter(Boolean).join("\n");
   }
 
@@ -310,7 +330,11 @@ export default function Page() {
 
           <div className="bd-lane-strip" role="tablist" aria-label="BriefDrop lanes">
             {Object.entries(laneMeta).map(([key, card]) => (
-              <button key={key} className={lane === key ? "bd-lane-tab is-active" : "bd-lane-tab"} onClick={() => chooseLane(key as LaneKey)}>
+              <button
+                key={key}
+                className={lane === key ? "bd-lane-tab is-active" : "bd-lane-tab"}
+                onClick={() => chooseLane(key as LaneKey)}
+              >
                 {card.short}
               </button>
             ))}
@@ -453,6 +477,22 @@ export default function Page() {
                 <SectionCard title="Verified material"><ParagraphOrEmpty text={matter.verifiedMaterial} empty="No verified material logged yet." /></SectionCard>
               </div>
 
+              {(lane === "disputes" || lane === "support") && (
+                <>
+                  <div className="bd-section-label">Lane-specific pack</div>
+                  <div className="bd-two-col">
+                    <SectionCard title="Chronology"><BulletList items={result.chronology} empty="No chronology points found yet." /></SectionCard>
+                    <SectionCard title="Evidence checklist"><BulletList items={result.evidenceChecklist} empty="No evidence checklist built yet." /></SectionCard>
+                    {lane === "support"
+                      ? <SectionCard title="Terms explained"><BulletList items={result.termsExplained} empty="No terms explained yet." /></SectionCard>
+                      : <SectionCard title="Deadline flags"><BulletList items={result.deadlineFlags} empty="No deadline flags found." /></SectionCard>}
+                    {lane === "support"
+                      ? <SectionCard title="Rights / duties to check"><BulletList items={[...result.rightsChecks, ...result.dutiesChecks]} empty="No rights or duties checks surfaced yet." /></SectionCard>
+                      : <SectionCard title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>}
+                  </div>
+                </>
+              )}
+
               <div className="bd-section-label">Facts and gaps</div>
               <div className="bd-two-col">
                 <SectionCard title="Facts extracted"><BulletList items={result.requirements} empty="No clear requirements found." /></SectionCard>
@@ -466,7 +506,7 @@ export default function Page() {
                 <SectionCard title="Next steps"><BulletList items={result.nextSteps} empty="No next steps found." /></SectionCard>
                 <SectionCard title="Follow-up questions"><BulletList items={result.followUpQuestions} empty="No follow-up questions found." /></SectionCard>
                 <SectionCard title="Money / pricing references"><BulletList items={result.money} empty="No money references found." /></SectionCard>
-                <SectionCard title="Questions found"><BulletList items={result.questionsFound} empty="No direct questions found." /></SectionCard>
+                <SectionCard title="Deadline flags"><BulletList items={result.deadlineFlags} empty="No deadline flags found." /></SectionCard>
               </div>
 
               <div className="bd-two-col">
